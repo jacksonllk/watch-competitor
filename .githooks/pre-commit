@@ -1,0 +1,11 @@
+#!/bin/sh
+# Blocks commits that include saved API responses. They hold other sites' text and stay on this computer
+# in tests/fixtures/local/, which git ignores.
+# Turn on once per clone: git config core.hooksPath .githooks
+blocked=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '^tests/fixtures/' | grep -v '^tests/fixtures/README.md$')
+if [ -n "$blocked" ]; then
+  echo "Commit blocked: these files must stay local (saved API responses):"
+  echo "$blocked"
+  echo "Saved responses go in tests/fixtures/local/. Git ignores that folder."
+  exit 1
+fi
