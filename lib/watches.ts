@@ -3,7 +3,7 @@
  * News is not a monitor: see lib/news.ts.
  */
 import type { MonitorCreateParams } from "context.dev/resources";
-import { APP_TAG, creditsOf, type MonitorsApi } from "./context";
+import { APP_TAG, recordCall, USAGE_ROW, type MonitorsApi, type Usage } from "./context";
 import type { CompetitorRecord, Watch } from "./competitors";
 import type { PageKind } from "./find-pages";
 
@@ -24,23 +24,26 @@ export function monitorParams(competitor: CompetitorRecord, kind: PageKind, url:
   };
 }
 
-/** Creates one monitor per page found. Returns the watches and the credits the API reported. */
+/**
+ * Creates one monitor per page found. Creating is free. Each monitor's first check is charged
+ * 1 credit on its run, which the dashboard lists under /monitors/run.
+ */
 export async function startWatches(
   api: MonitorsApi,
   competitor: CompetitorRecord,
   pages: Partial<Record<PageKind, string>>,
   now: string,
-): Promise<{ watches: Partial<Record<PageKind, Watch>>; credits: number }> {
+  usage: Usage = {},
+): Promise<{ watches: Partial<Record<PageKind, Watch>> }> {
   const watches: Partial<Record<PageKind, Watch>> = {};
-  let credits = 0;
   for (const kind of ["pricing", "changelog"] as const) {
     const url = pages[kind];
     if (!url) continue;
     const monitor = await api.create(monitorParams(competitor, kind, url));
-    credits += creditsOf(monitor);
+    recordCall(usage, USAGE_ROW.createMonitor, monitor);
     watches[kind] = { url, monitorId: monitor.id, addedAt: now };
   }
-  return { watches, credits };
+  return { watches };
 }
 
 /** Deletes the monitors. Deleting also deletes context.dev's copy of their changes: sync first. */

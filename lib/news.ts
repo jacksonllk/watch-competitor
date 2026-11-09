@@ -4,7 +4,7 @@
  * one per story.
  */
 import type { NewsSearchResponse } from "context.dev/resources";
-import { APP_TAG, creditsOf, failureOf, type NewsApi } from "./context";
+import { APP_TAG, creditsOf, failureOf, recordCall, USAGE_ROW, type NewsApi, type Usage } from "./context";
 import type { CompetitorRecord } from "./competitors";
 import type { Store } from "./store/types";
 
@@ -47,6 +47,7 @@ export async function checkNews(
   api: NewsApi,
   competitor: CompetitorRecord,
   now: Date,
+  usage: Usage = {},
 ): Promise<{ checked: boolean; saved: number; credits: number }> {
   const last = await store.get<NewsCheck>(newsCheckKey(competitor.slug));
   if (last && now.getTime() - Date.parse(last.at) < DAY_MS - 60_000) return { checked: false, saved: 0, credits: 0 };
@@ -66,6 +67,7 @@ export async function checkNews(
         tags: [APP_TAG],
       });
       credits += creditsOf(res);
+      recordCall(usage, USAGE_ROW.news, res);
       found.push(...res.data);
       if (!res.has_more || !res.next_cursor) break;
       cursor = res.next_cursor;

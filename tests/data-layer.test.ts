@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { slugFor, type CompetitorRecord } from "@/lib/competitors";
+import { addCompetitor } from "@/lib/add-competitor";
+import { loadCompetitors, slugFor, type CompetitorRecord } from "@/lib/competitors";
 import { APP_TAG } from "@/lib/context";
 import { fixtureChanges } from "@/lib/fixtures/changes";
 import { fixtureNewsSearch } from "@/lib/fixtures/preview";
@@ -131,5 +132,52 @@ describe("slugFor", () => {
     expect(slugFor("Acme Notes", "acme-notes.example", [])).toBe("acme-notes");
     expect(slugFor("Acme Notes", "other.example", [acme])).toBe("acme-notes-2");
     expect(slugFor("Acme Notes", "acme-notes.example", [acme])).toBe("acme-notes");
+  });
+});
+
+describe("addCompetitor", () => {
+  const web = async (url: URL) =>
+    url.href === "https://acme-notes.example/pricing" ? { status: 200, location: null } : { status: 404, location: null };
+
+  it("creates monitors only for found pages, saves the competitor and checks its news", async () => {
+    const store = createMemoryStore();
+    const { api, created, searched, brandSearched } = fakeContext({ articles: fixtureNewsSearch.data });
+    const result = await addCompetitor(store, api, { domain: "https://www.Acme-Notes.example/" }, { fetchHop: web, now: new Date("2026-11-09T06:00:00Z") });
+    expect(result.status).toBe("added");
+    if (result.status !== "added") return;
+    expect(result.competitor).toMatchObject({ slug: "acme-notes", name: "Acme Notes", domain: "acme-notes.example", status: "watching" });
+    expect(Object.keys(result.competitor.watches)).toEqual(["pricing"]);
+    expect(created.map((c) => c.name)).toEqual(["Acme Notes · pricing"]);
+    expect(brandSearched).toEqual(["acme-notes.example"]);
+    expect(searched).toHaveLength(1);
+    expect(result.usage).toEqual({
+      "/v1/monitors/limits": { calls: 1, credits: 0 },
+      "Auto-complete": { calls: 1, credits: 1 },
+      "/monitors": { calls: 1, credits: 0 },
+      "Search News": { calls: 1, credits: 1 },
+    });
+    expect(result.firstChecks).toBe(1);
+    expect((await loadCompetitors(store)).map((c) => c.slug)).toEqual(["acme-notes"]);
+  });
+
+  it("does not add a competitor twice", async () => {
+    const store = createMemoryStore();
+    const { api, created } = fakeContext();
+    await addCompetitor(store, api, { domain: "acme-notes.example" }, { fetchHop: web });
+    expect((await addCompetitor(store, api, { domain: "acme-notes.example" }, { fetchHop: web })).status).toBe("already_watching");
+    expect(created).toHaveLength(1);
+  });
+
+  it("stops before spending anything when the monitor slots are full", async () => {
+    const store = createMemoryStore();
+    const { api, created, brandSearched } = fakeContext({ monitorsUsed: 10 });
+    expect(await addCompetitor(store, api, { domain: "acme-notes.example" }, { fetchHop: web })).toEqual({
+      status: "no_monitor_slots",
+      used: 10,
+      limit: 10,
+      needed: 1,
+    });
+    expect(created).toHaveLength(0);
+    expect(brandSearched).toHaveLength(0);
   });
 });

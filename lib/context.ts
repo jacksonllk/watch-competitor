@@ -4,7 +4,10 @@
  */
 import ContextDev, { APIError } from "context.dev";
 import type {
+  BrandSearchParams,
+  BrandSearchResponse,
   MonitorCreateParams,
+  MonitorGetLimitsResponse,
   MonitorListAccountChangesParams,
   MonitorListAccountChangesResponse,
   MonitorListRunsParams,
@@ -23,13 +26,40 @@ export type MonitorsApi = {
   delete(monitorId: string): PromiseLike<unknown>;
   listAccountChanges(query: MonitorListAccountChangesParams): PromiseLike<MonitorListAccountChangesResponse>;
   listRuns(monitorId: string, query: MonitorListRunsParams): PromiseLike<MonitorListRunsResponse>;
+  getLimits(): PromiseLike<MonitorGetLimitsResponse>;
 };
 export type NewsApi = { search(body: NewsSearchParams): PromiseLike<NewsSearchResponse> };
-export type ContextApi = { monitors: MonitorsApi; news: NewsApi };
+export type BrandApi = { search(query: BrandSearchParams): PromiseLike<BrandSearchResponse> };
+export type ContextApi = { monitors: MonitorsApi; news: NewsApi; brand: BrandApi };
 
 /** The live client. Reads CONTEXT_DEV_API_KEY. */
 export function liveApi(): ContextApi {
   return new ContextDev({ apiKey: process.env.CONTEXT_DEV_API_KEY });
+}
+
+/**
+ * Calls and credits per API, named as the context.dev dashboard's "By API" usage shows them,
+ * so the app's numbers can be checked against the dashboard row by row.
+ */
+export const USAGE_ROW = {
+  brandSearch: "Auto-complete",
+  news: "Search News",
+  createMonitor: "/monitors",
+  limits: "/v1/monitors/limits",
+  listRuns: "/monitors/{monitor_id}/runs",
+  listChanges: "/monitors/changes",
+} as const;
+export type Usage = Record<string, { calls: number; credits: number }>;
+
+/** Adds one call and the credits its response reports. */
+export function recordCall(usage: Usage, row: string, response: unknown): void {
+  const entry = (usage[row] ??= { calls: 0, credits: 0 });
+  entry.calls += 1;
+  entry.credits += creditsOf(response);
+}
+
+export function totalCredits(usage: Usage): number {
+  return Object.values(usage).reduce((sum, row) => sum + row.credits, 0);
 }
 
 /** Credits a response reports. 0 when the response has no key_metadata. */
