@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { kindOf, slugOf, toEvent } from "@/lib/events";
+import { articleToEvent, kindOf, slugOf, toEvent } from "@/lib/events";
 import { fixtureChanges } from "@/lib/fixtures/changes";
 import { fixtureCompetitors } from "@/lib/fixtures/competitors";
+import { fixtureNewsSearch } from "@/lib/fixtures/preview";
 
 const byId = (id: string) => fixtureChanges.find((c) => c.id === id)!;
 
@@ -15,7 +16,6 @@ describe("toEvent", () => {
     // Pricing and Changelog are both page targets.
     expect(toEvent(byId("chg_fx_acme_price"), fixtureCompetitors)!.kind).toBe("pricing");
     expect(toEvent(byId("chg_fx_acme_slack"), fixtureCompetitors)!.kind).toBe("changelog");
-    expect(toEvent(byId("chg_fx_acme_seed"), fixtureCompetitors)!.kind).toBe("news");
   });
 
   it("finds the competitor from the cw:<slug> tag", () => {
@@ -23,9 +23,14 @@ describe("toEvent", () => {
     expect(event.competitor).toEqual({ slug: "beta-minutes", name: "Beta Minutes", domain: "beta-minutes.example" });
   });
 
-  it("uses the diff as the excerpt for a page, and the article text for news", () => {
+  it("uses the diff as the excerpt for a page", () => {
     expect(toEvent(byId("chg_fx_acme_price"), fixtureCompetitors)!.excerpt).toContain("+ Team: $10 per seat a month");
-    expect(toEvent(byId("chg_fx_acme_seed"), fixtureCompetitors)!.excerpt).toContain("double its sales team");
+  });
+
+  it("maps a News article to a news event with the article text", () => {
+    const event = articleToEvent(fixtureNewsSearch.data[0], fixtureCompetitors[0]);
+    expect(event).toMatchObject({ kind: "news", title: "Acme Notes announces a seed round", detectedAt: "2026-11-03T06:00:00Z", importance: null });
+    expect(event.excerpt).toContain("double its sales team");
   });
 
   it("skips a change without our tags or for a competitor no longer watched", () => {

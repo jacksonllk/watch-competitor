@@ -1,8 +1,8 @@
 /**
- * The one place that maps context.dev monitor changes to app events.
+ * The one place that maps context.dev monitor changes and News articles to app events.
  * If the API's change shape differs from the docs, the fix goes here.
  */
-import type { MonitorListAccountChangesResponse } from "context.dev/resources";
+import type { MonitorListAccountChangesResponse, NewsSearchResponse } from "context.dev/resources";
 
 export type Change = MonitorListAccountChangesResponse.Data;
 export type EventKind = "pricing" | "changelog" | "news";
@@ -67,5 +67,23 @@ export function toEvent(change: Change, competitors: Competitor[]): CompetitorEv
     after: change.after_text_excerpt || null,
     diff: change.diff || null,
     excerpt: change.diff || change.after_text_excerpt || evidence || null,
+  };
+}
+
+/** A News API article as a timeline event. News has no importance rating and no diff. */
+export function articleToEvent(article: NewsSearchResponse.Data, competitor: Competitor): CompetitorEvent {
+  return {
+    id: article.id,
+    kind: "news",
+    competitor,
+    title: article.title,
+    summary: article.description ?? article.title,
+    detectedAt: article.published_at ?? "",
+    url: article.url,
+    importance: null,
+    before: null,
+    after: null,
+    diff: null,
+    excerpt: article.description,
   };
 }

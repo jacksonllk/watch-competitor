@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { toEvent, type Change, type CompetitorEvent } from "@/lib/events";
+import { articleToEvent, toEvent, type Change, type CompetitorEvent } from "@/lib/events";
 import { fixtureChanges, injectionChange, longChange } from "@/lib/fixtures/changes";
 import { fixtureCompetitors } from "@/lib/fixtures/competitors";
+import { fixtureNewsSearch } from "@/lib/fixtures/preview";
 import { buildPrompt, CHANGES_LIMIT } from "@/lib/prompt";
 import { loadTemplates } from "@/lib/prompt-templates";
 
 const templates = loadTemplates();
 const event = (change: Change): CompetitorEvent => toEvent(change, fixtureCompetitors)!;
 const byId = (id: string) => event(fixtureChanges.find((c) => c.id === id)!);
+const seed = articleToEvent(fixtureNewsSearch.data[0], fixtureCompetitors[0]);
 
 /** The text before, inside and after the untrusted block. */
 function split(prompt: string) {
@@ -42,12 +44,12 @@ describe("buildPrompt", () => {
   it("uses the task list for each event type", () => {
     expect(buildPrompt(byId("chg_fx_beta_languages"), templates)).toContain("Type: New feature");
     expect(buildPrompt(byId("chg_fx_beta_languages"), templates)).toContain("2. Do we have it? Be honest about the gap.");
-    expect(buildPrompt(byId("chg_fx_acme_seed"), templates)).toContain("Type: News");
-    expect(buildPrompt(byId("chg_fx_acme_seed"), templates)).toContain("4. Recommend: act this week, or watch.");
+    expect(buildPrompt(seed, templates)).toContain("Type: News");
+    expect(buildPrompt(seed, templates)).toContain("4. Recommend: act this week, or watch.");
   });
 
   it("gives the article text for news", () => {
-    expect(split(buildPrompt(byId("chg_fx_acme_seed"), templates)).inside).toContain(
+    expect(split(buildPrompt(seed, templates)).inside).toContain(
       "Acme Notes has raised a seed round. It plans to double its sales team next year.",
     );
   });

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { toEvent } from "@/lib/events";
+import { articleToEvent, toEvent } from "@/lib/events";
 import { fixtureChanges, longChange } from "@/lib/fixtures/changes";
 import { fixtureCompetitors } from "@/lib/fixtures/competitors";
+import { fixtureNewsSearch } from "@/lib/fixtures/preview";
 import { MAX_ROWS, readDiff, ROW_TEXT_LIMIT, rowText, whatChanged } from "@/lib/what-changed";
 
 const byId = (id: string) => toEvent(fixtureChanges.find((c) => c.id === id)!, fixtureCompetitors)!;
@@ -71,7 +72,7 @@ describe("whatChanged", () => {
   });
 
   it("gives the article text for news", () => {
-    expect(whatChanged(byId("chg_fx_acme_seed")).rows[0]).toMatchObject({ type: "text" });
+    expect(whatChanged(articleToEvent(fixtureNewsSearch.data[0], fixtureCompetitors[0])).rows[0]).toMatchObject({ type: "text" });
   });
 
   it("writes each row type as one plain line", () => {

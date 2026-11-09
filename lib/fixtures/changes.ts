@@ -1,5 +1,6 @@
 /**
- * Made-up monitor changes for three made-up companies, typed against the context.dev SDK.
+ * Made-up monitor changes (Pricing and Changelog) for three made-up companies, typed against the context.dev SDK.
+ * News comes from the News API, not from monitors: see lib/fixtures/preview.ts.
  * Used by tests and offline development. Never use them for the README, the demo GIF or any public image.
  */
 import type { Change } from "@/lib/events";
@@ -26,29 +27,6 @@ export const fixtureChanges: Change[] = [
   },
   {
     ...base,
-    id: "chg_fx_beta_partnership",
-    monitor_id: "mon_fx_beta_news",
-    run_id: "run_fx_05",
-    detected_at: "2026-11-05T07:15:00Z",
-    target_type: "search",
-    tags: ["competitor-watch", "cw:beta-minutes", "kind:news"],
-    title: "Beta Minutes announces a partnership with Sample Cloud",
-    summary: "Sample Cloud will bundle Beta Minutes with its business plan from December.",
-    url: "https://sample-daily.example/beta-minutes-sample-cloud",
-    importance: "medium",
-    confidence: 0.81,
-    matched_url_count: 1,
-    matched_urls: ["https://sample-daily.example/beta-minutes-sample-cloud"],
-    evidence: [
-      {
-        before: "",
-        after: "Sample Cloud said on Thursday it will include Beta Minutes in its business plan from December.",
-        url: "https://sample-daily.example/beta-minutes-sample-cloud",
-      },
-    ],
-  },
-  {
-    ...base,
     id: "chg_fx_acme_price",
     monitor_id: "mon_fx_acme_pricing",
     run_id: "run_fx_04",
@@ -63,29 +41,6 @@ export const fixtureChanges: Change[] = [
     before_text_excerpt: "$8 per seat",
     after_text_excerpt: "$10 per seat",
     diff: "- Team: $8 per seat a month\n+ Team: $10 per seat a month\n- Free: up to 5 members\n+ Free: up to 3 members",
-  },
-  {
-    ...base,
-    id: "chg_fx_acme_seed",
-    monitor_id: "mon_fx_acme_news",
-    run_id: "run_fx_03",
-    detected_at: "2026-11-03T06:30:00Z",
-    target_type: "search",
-    tags: ["competitor-watch", "cw:acme-notes", "kind:news"],
-    title: "Acme Notes announces a seed round",
-    summary: "Acme Notes raised a seed round to grow its sales team.",
-    url: "https://sample-daily.example/acme-notes-seed",
-    importance: "medium",
-    confidence: 0.88,
-    matched_url_count: 1,
-    matched_urls: ["https://sample-daily.example/acme-notes-seed"],
-    evidence: [
-      {
-        before: "",
-        after: "Acme Notes has raised a seed round. It plans to double its sales team next year.",
-        url: "https://sample-daily.example/acme-notes-seed",
-      },
-    ],
   },
   {
     ...base,
