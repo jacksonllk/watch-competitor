@@ -4,9 +4,10 @@
  * only when something can have happened:
  * - a monitor's daily run time has passed (context.dev runs each monitor once a day, each at its own time),
  * - the user pressed Check now in the last 20 minutes,
+ * - a first check is running: a monitor was just added or given a new address (every 15 seconds, for up to 10 minutes),
  * - the last read failed (try again), or
  * - nothing was read for 6 hours (a backstop for status changes such as a monitor paused in context.dev).
- * Never more often than every 5 minutes. A read is one list call, plus runs only for monitors whose last run moved,
+ * Otherwise never more often than every 5 minutes. A read is one list call, plus runs only for monitors whose last run moved,
  * plus a change sync only when a monitor reports a newer change.
  */
 import { loadCompetitors } from "./competitors";
@@ -24,6 +25,9 @@ export const REFRESH_EVERY_MS = 5 * 60 * 1000;
 const RUN_WINDOW_MS = 60 * 60 * 1000;
 const BACKSTOP_MS = 6 * 60 * 60 * 1000;
 const CHECK_NOW_WINDOW_MS = 20 * 60 * 1000;
+/** A first check takes seconds, so while one runs the page reads every 15 seconds, for up to 10 minutes. */
+export const FIRST_CHECK_EVERY_MS = 15 * 1000;
+const FIRST_CHECK_WINDOW_MS = 10 * 60 * 1000;
 
 export type SavedStates = {
   /** When the states were last read from context.dev. Empty when they never were. */
@@ -38,6 +42,8 @@ export type SavedStates = {
   settings?: string;
   /** Until this time, read every 5 minutes: the user pressed Check now. */
   watchUntil?: string | null;
+  /** Until this time, read every 15 seconds: a first check is running. Cleared once no monitor is setting up. */
+  firstChecksUntil?: string | null;
   /** Set when the last attempt failed. The states above are then from `at`. */
   failedAt: string | null;
 };
@@ -60,7 +66,9 @@ const settingsKey = (s: MonitorSettings) => JSON.stringify([s.webhookUrl, s.sche
 /** Whether a read can find something new now. See the rules at the top of this file. */
 export function isDue(saved: SavedStates | null, now: Date, settings: MonitorSettings = currentSettings()): boolean {
   const t = now.getTime();
-  if (t - Math.max(time(saved?.at), time(saved?.failedAt)) < REFRESH_EVERY_MS) return false;
+  const firstChecks = checkingFirstRuns(saved, now);
+  if (t - Math.max(time(saved?.at), time(saved?.failedAt)) < (firstChecks ? FIRST_CHECK_EVERY_MS : REFRESH_EVERY_MS)) return false;
+  if (firstChecks) return true;
   if (!saved?.at || saved.failedAt) return true;
   if (saved.settings !== settingsKey(settings)) return true;
   if (saved.watchUntil && t < time(saved.watchUntil)) return true;
@@ -84,12 +92,21 @@ export function showStaleWarning(saved: SavedStates | null, now: Date): boolean 
   return Boolean(saved?.failedAt) && now.getTime() - time(saved?.at) >= STALE_WARNING_MS;
 }
 
-/** After Check now: read every 5 minutes for the next 20 minutes, so the result shows soon. */
-export async function watchForResults(store: Store, now: Date = new Date()): Promise<void> {
+/** True while a first check runs after the user added a monitor or changed its address. Open pages then ask every 10 seconds. */
+export function checkingFirstRuns(saved: SavedStates | null, now: Date): boolean {
+  return now.getTime() < time(saved?.firstChecksUntil);
+}
+
+/**
+ * After Check now: read every 5 minutes for the next 20 minutes, so the result shows soon.
+ * firstChecks (a new monitor or a new address): also read every 15 seconds until its first check is done.
+ */
+export async function watchForResults(store: Store, now: Date = new Date(), options: { firstChecks?: boolean } = {}): Promise<void> {
   const saved = await loadSavedStates(store);
   await store.set(WATCH_STATES, {
     ...(saved ?? { at: "", states: {}, failedAt: null }),
     watchUntil: new Date(now.getTime() + CHECK_NOW_WINDOW_MS).toISOString(),
+    ...(options.firstChecks ? { firstChecksUntil: new Date(now.getTime() + FIRST_CHECK_WINDOW_MS).toISOString() } : {}),
   } satisfies SavedStates);
 }
 
@@ -124,6 +141,10 @@ async function runRefresh(
   try {
     const competitors = await loadCompetitors(store);
     const snapshot = await readMonitors(api, competitors, saved?.at ? saved : null);
+    // People see "checks stopped for now". The developer reads the cause here.
+    if ([...snapshot.states.values()].some((w) => w.state === "not_working" && w.fix === "contact_support")) {
+      console.warn("context.dev skipped monitor runs: the account is out of credits.");
+    }
     await alignMonitors(store, api, snapshot.monitors, settings);
     const synced = snapshot.changesMoved;
     const { saved: savedChanges } = synced ? await syncChanges(store, api) : { saved: 0 };
@@ -135,6 +156,8 @@ async function runRefresh(
       lastChanges: snapshot.lastChanges,
       statuses: snapshot.statuses,
       watchUntil: saved?.watchUntil ?? null,
+      // Keep reading fast only while a monitor is still on its first check.
+      firstChecksUntil: [...snapshot.states.values()].some((s) => s.state === "setting_up") ? (saved?.firstChecksUntil ?? null) : null,
       settings: settingsKey(settings),
       failedAt: null,
     };

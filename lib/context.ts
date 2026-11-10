@@ -89,6 +89,10 @@ export type ApiFailure = {
 export function failureOf(error: unknown): ApiFailure {
   if (!(error instanceof APIError)) return { status: null, code: null, nextRefillAt: null };
   const body = (error.error ?? {}) as { error_code?: string; error_data?: { next_refill_at?: string } };
+  // People using the app see neutral words ("Try again later"). The developer reads the cause here.
+  if (error.status === 402) {
+    console.warn(`context.dev: the account is out of credits${body.error_data?.next_refill_at ? `, refill at ${body.error_data.next_refill_at}` : ""}.`);
+  }
   return {
     status: error.status ?? null,
     code: body.error_code ?? null,

@@ -92,5 +92,50 @@
       "label": "Write a note for the team",
       "instruction": "Write a note for our team chat, five lines at most: what happened, what it means for us and what we will do."
     }
+  ],
+  "page": [
+    {
+      "id": "assess",
+      "label": "Assess and recommend",
+      "outcome": "Asks your agent what this change says about their plans, and what to do.",
+      "instruction": "Say in plain words what changed on their {{page}} page and what it says about their plans. Say whether it is a threat, an opportunity or neither for us, and why. Then recommend what we should do, if anything, and how soon."
+    },
+    {
+      "id": "outreach",
+      "for": [
+        "customers"
+      ],
+      "label": "Draft outreach to customers they lost",
+      "instruction": "If a customer was removed from their page, draft a short, respectful email introducing us to that customer, with a subject line, and say who on our side should send it. If customers were only added, say what that tells us about who they sell to, and skip the email."
+    },
+    {
+      "id": "claims",
+      "for": [
+        "compare"
+      ],
+      "label": "Answer their claims about us",
+      "instruction": "If they compare themselves with us, list each claim, say whether it is true, and draft our answer for sales and for our own comparison page. If they do not mention us, say so and skip this."
+    },
+    {
+      "id": "comparison",
+      "for": [
+        "customers",
+        "security",
+        "compare",
+        "other"
+      ],
+      "label": "Update our comparison with {{name}}",
+      "instruction": "Find every page and doc where we compare ourselves with {{name}} (search our repo and site for \"{{name}}\"). For each, give the file or URL, the claim that is now wrong and the corrected text as a diff. If you find none, say so."
+    },
+    {
+      "id": "sales",
+      "label": "Write talking points for sales",
+      "instruction": "Write three talking points sales can use when a prospect brings this up. Keep each under 25 words and honest."
+    },
+    {
+      "id": "team",
+      "label": "Write a note for the team",
+      "instruction": "Write a note for our team chat, five lines at most: what changed, what it means for us and what we will do."
+    }
   ]
 }

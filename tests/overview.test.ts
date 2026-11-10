@@ -5,7 +5,7 @@ import { fixtureChanges } from "@/lib/fixtures/changes";
 import { fixtureNewsSearch } from "@/lib/fixtures/preview";
 import { newsCheckKey, newsKey } from "@/lib/news";
 import { earliestDay, isShown, loadOverview, mondayOf, readFilter, readRange } from "@/lib/overview";
-import { isDue, loadSavedStates, nextRun, refresh, showStaleWarning, watchForResults } from "@/lib/refresh";
+import { checkingFirstRuns, isDue, loadSavedStates, nextRun, refresh, showStaleWarning, watchForResults } from "@/lib/refresh";
 import { createMemoryStore } from "@/lib/store/memory";
 import { changesKey } from "@/lib/sync";
 import { monitorState, newsState, readMonitors } from "@/lib/watch-status";
@@ -90,7 +90,7 @@ describe("monitorState", () => {
 
   it("says when credits ran out or the monitor was paused", () => {
     const skipped = run({ status: "skipped", skip_reason: "insufficient_credits", credits_charged: 0 });
-    expect(monitorState("pricing", [skipped, run({})], "active")).toMatchObject({ state: "not_working", fix: "wait_for_refill" });
+    expect(monitorState("pricing", [skipped, run({})], "active")).toMatchObject({ state: "not_working", fix: "contact_support" });
     const failed = run({ status: "failed", error: { code: "fetch_failed", message: "" } });
     expect(monitorState("pricing", [failed, failed, failed], "paused")).toMatchObject({
       state: "not_working",
@@ -234,6 +234,29 @@ describe("refresh", () => {
     expect(isDue(saved, later(3 * 60_000))).toBe(false);
     expect(isDue(saved, later(6 * 60_000))).toBe(true);
     expect(isDue(saved, later(25 * 60_000))).toBe(false);
+  });
+
+  it("reads every 15 seconds while a new monitor's first check runs, then goes back to every 5 minutes", async () => {
+    const store = createMemoryStore();
+    await store.set("competitors", [acme]);
+    // The new monitor has not finished its first check: no completed run yet.
+    const setting = fakeContext({ monitors, runs: { mon_p: [] } });
+    await refresh(store, setting.api.monitors, { now: at });
+    await watchForResults(store, at, { firstChecks: true });
+    let saved = await loadSavedStates(store);
+    expect(checkingFirstRuns(saved, later(10_000))).toBe(true);
+    expect(isDue(saved, later(10_000))).toBe(false);
+    expect(isDue(saved, later(20_000))).toBe(true);
+    await refresh(store, setting.api.monitors, { now: later(20_000) });
+    expect((await loadSavedStates(store))?.firstChecksUntil).toBeTruthy();
+
+    // The first check finished: the next read clears the window.
+    const ran = [{ ...(monitors[0] as object), last_run_at: "2026-11-09T10:00:30Z" }] as never[];
+    const done = fakeContext({ monitors: ran, runs: { mon_p: [run({})] } });
+    await refresh(store, done.api.monitors, { now: later(40_000), force: true });
+    saved = await loadSavedStates(store);
+    expect(saved?.firstChecksUntil).toBeNull();
+    expect(isDue(saved, later(60_000))).toBe(false);
   });
 
   it("keeps the last good states and tries again after a failure", async () => {

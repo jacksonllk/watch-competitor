@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { relative } from "@/app/ui/format";
-import { checkNow, deleteHistory, removeCompetitor } from "@/lib/competitor-actions";
+import { checkNow, deleteHistory, editAddress, removeCompetitor } from "@/lib/competitor-actions";
 import { loadCompetitorPage } from "@/lib/competitor-page";
 import { loadCompetitors, type CompetitorRecord } from "@/lib/competitors";
 import { fixtureChanges } from "@/lib/fixtures/changes";
@@ -76,6 +76,29 @@ describe("competitor actions", () => {
   });
 });
 
+describe("edit address", () => {
+  it("points the monitor at the new address with the same instructions, resumes it and saves the address", async () => {
+    const store = await storeWith({ ...acme, focus: "Only report changes about teams." });
+    const { api, updated } = fakeContext();
+    const result = await editAddress(store, api.monitors, "acme-notes", "mon_p", "https://acme-notes.example/plans");
+    expect(result.status).toBe("updated");
+    expect(updated).toHaveLength(1);
+    expect(updated[0].id).toBe("mon_p");
+    expect(updated[0].body).toMatchObject({ status: "active", target: { type: "page", url: "https://acme-notes.example/plans" } });
+    expect((updated[0].body.target as { instructions: string }).instructions).toContain("Only report changes about teams.");
+    expect((await loadCompetitors(store))[0].watches.pricing?.url).toBe("https://acme-notes.example/plans");
+  });
+
+  it("edits an extra page, and refuses a monitor that is not this competitor's", async () => {
+    const extra = [{ url: "https://acme-notes.example/blog", monitorId: "mon_b", addedAt: "x", kind: "changelog" as const, label: "Blog" }];
+    const store = await storeWith({ ...acme, extra });
+    const { api } = fakeContext();
+    await editAddress(store, api.monitors, "acme-notes", "mon_b", "https://acme-notes.example/news");
+    expect((await loadCompetitors(store))[0].extra?.[0].url).toBe("https://acme-notes.example/news");
+    expect(await editAddress(store, api.monitors, "acme-notes", "mon_other", "https://x.example")).toEqual({ status: "not_found" });
+  });
+});
+
 describe("loadCompetitorPage", () => {
   it("splits news into before and after it was added, and filters by kind", async () => {
     const store = await storeWith({ ...acme, addedAt: "2026-11-02T00:00:00.000Z" });
@@ -100,13 +123,34 @@ describe("loadCompetitorPage", () => {
     expect(page?.settingUp).toBe(true);
     expect(page?.compared).toBe(true);
     expect((await loadCompetitorPage(store, "acme-notes", saved, { kind: "pricing" }))?.events).toEqual([]);
+    expect(page?.filters.map((f) => f.label)).toEqual(["Features", "Pricing", "News"]);
     expect(await loadCompetitorPage(store, "nobody", saved)).toBeNull();
+  });
+
+  it("gives each extra page its own filter, named after its tag", async () => {
+    const store = await storeWith({
+      ...acme,
+      extra: [
+        { url: "https://acme-notes.example/careers", monitorId: "mon_k", addedAt: acme.addedAt, kind: "page", label: "Careers", page: "careers" },
+        { url: "https://acme-notes.example/integrations", monitorId: "mon_i", addedAt: acme.addedAt, kind: "changelog", label: "Integrations" },
+      ],
+    });
+    const page = await loadCompetitorPage(store, "acme-notes", null, { kind: "careers" });
+    expect(page?.filters.map((f) => [f.key, f.label])).toEqual([
+      ["changelog", "Features"],
+      ["pricing", "Pricing"],
+      ["news", "News"],
+      ["careers", "Careers"],
+      ["integrations", "Integrations"],
+    ]);
+    expect(page?.filter).toBe("careers");
+    expect((await loadCompetitorPage(store, "acme-notes", null, { kind: "page" }))?.filter).toBeNull();
   });
 
   it("shows a page the user chose not to watch as not watched, not as broken", async () => {
     const store = await storeWith({ ...acme, watches: { pricing: acme.watches.pricing } });
     const page = await loadCompetitorPage(store, "acme-notes", null);
-    expect(page?.watches.find((w) => w.kind === "changelog")).toEqual({ kind: "changelog", url: null, state: null });
+    expect(page?.watches.find((w) => w.kind === "changelog")).toEqual({ kind: "changelog", url: null, state: null, label: "Changelog" });
   });
 });
 

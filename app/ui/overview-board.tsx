@@ -8,6 +8,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { EventKind } from "@/lib/events";
+import type { PageType } from "@/lib/page-types";
 import { weekLabel } from "./format";
 import { HoverCard } from "./hover-card";
 import { CompanyMark } from "./mark";
@@ -29,6 +30,9 @@ export type FeedItem = {
   logo: string | null;
   colorIndex: number;
   kind: EventKind;
+  /** Extra pages: the page's name for its tag, and what kind of page it is. */
+  label?: string;
+  page?: PageType;
   title: string;
   url: string;
   day: string;
@@ -96,6 +100,8 @@ export function OverviewBoard({ rows, items, today: todayDay, earliest: earliest
           id: i.id,
           slug: i.slug,
           kind: i.kind,
+          label: i.label,
+          page: i.page,
           title: i.title,
           n: i.n,
           detail: i.line.type === "changed" ? `${i.line.before} → ${i.line.after}` : i.line.text,
@@ -246,26 +252,33 @@ function WeekBar({ label, count, status = "" }: { label: string; count: number; 
   );
 }
 
+/**
+ * One change. Desktop: date, company, tag, title, Assess in the Feed's shared columns.
+ * Phone: two columns, so no line holds one small thing: company and tag with the date on the right,
+ * then the title and its line with Assess at the bottom right.
+ */
 function FeedRow({ item, today }: { item: FeedItem; today: number }) {
   return (
     <article
       id={`event-${item.id}`}
-      className={`grid scroll-mt-24 grid-cols-1 items-start gap-x-4 gap-y-1.5 border-b border-rule ${PAD} py-3 transition-colors hover:bg-panel md:col-span-full md:grid-cols-subgrid`}
+      className={`grid scroll-mt-24 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 border-b border-rule ${PAD} py-3 transition-colors hover:bg-panel md:col-span-full md:grid-cols-subgrid md:gap-x-4 md:gap-y-1.5`}
     >
-      <span className="figures text-small text-muted md:pt-0.5">{shortDay(item.n, today)}</span>
-      <span className="text-body flex items-center gap-2">
+      <span className="figures text-small col-start-2 row-start-1 self-center justify-self-end text-muted md:col-auto md:row-auto md:self-auto md:justify-self-auto md:pt-0.5">
+        {shortDay(item.n, today)}
+      </span>
+      <span className="text-body col-start-1 row-start-1 flex min-w-0 items-center gap-2 md:col-auto md:row-auto">
         <CompanyMark name={item.name} logo={item.logo} colorIndex={item.colorIndex} size={16} />
         <Link href={`/c/${item.slug}`} className="max-w-[180px] truncate hover:underline">
           {item.name}
         </Link>
         <span className="md:hidden">
-          <Tag kind={item.kind} />
+          <Tag kind={item.kind} label={item.label} page={item.page} />
         </span>
       </span>
       <span className="hidden md:block md:pt-0.5">
-        <Tag kind={item.kind} />
+        <Tag kind={item.kind} label={item.label} page={item.page} />
       </span>
-      <div className="min-w-0">
+      <div className="col-start-1 row-start-2 min-w-0 md:col-auto md:row-auto">
         <a href={item.url} className="text-body font-semibold hover:underline" rel="noreferrer" target="_blank">
           {item.title}
         </a>
@@ -294,7 +307,7 @@ function FeedRow({ item, today }: { item: FeedItem; today: number }) {
           <p className="text-body mt-0.5 text-copy">{item.line.text}</p>
         )}
       </div>
-      <div className="md:pt-0.5">
+      <div className="col-start-2 row-start-2 self-end md:col-auto md:row-auto md:self-auto md:pt-0.5">
         <AssessButton data={item.assess} />
       </div>
     </article>

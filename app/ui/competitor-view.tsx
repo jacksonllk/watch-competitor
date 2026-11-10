@@ -3,13 +3,14 @@ import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import { loadCompetitorPage, type CompetitorPage, type WatchRow } from "@/lib/competitor-page";
 import type { CompetitorEvent, EventKind } from "@/lib/events";
+import { loadConfig } from "@/lib/config";
+import { PAGE_INSTRUCTIONS } from "@/lib/page-types";
 import { loadTasks, loadTemplates } from "@/lib/prompt-templates";
-import { isDue, loadSavedStates } from "@/lib/refresh";
+import { checkingFirstRuns, isDue, loadSavedStates } from "@/lib/refresh";
 import { isDemo } from "@/lib/links";
 import { getStore } from "@/lib/store";
 import { whatChanged } from "@/lib/what-changed";
 import { ChangeRows } from "./changes";
-import { KIND_NAME } from "./colors";
 import { CompetitorActions } from "./competitor-actions";
 import { hostOf, relative, shortDate, shortUrl } from "./format";
 import { Refresher } from "./refresher";
@@ -17,13 +18,15 @@ import { AssessButton } from "./assess";
 import { assessData } from "./assess-data";
 import { ShowMore } from "./show-more";
 import { CompanyMark } from "./mark";
+import { EditAddressButton } from "./edit-address";
 import { HoverCard } from "./hover-card";
+import { SettingUp, setupSteps } from "./setting-up";
+import { ManageMonitorsButton, type ManagedMonitor } from "./manage-monitors";
 import { STATE_COLOR, Stat, Strip, Value } from "./strip";
 import { Tag } from "./tag";
 
 const PAD = "px-(--gutter)";
-const CHIP: Record<EventKind, string> = { changelog: "Features", pricing: "Pricing", news: "News" };
-const OPEN_LABEL: Record<EventKind, string> = { pricing: "Open pricing page", changelog: "Open changelog", news: "Open article" };
+const OPEN_LABEL: Record<EventKind, string> = { pricing: "Open pricing page", changelog: "Open changelog", news: "Open article", page: "Open page" };
 
 export async function CompetitorView({
   params,
@@ -43,10 +46,11 @@ export async function CompetitorView({
   const templates = loadTemplates();
   const tasks = loadTasks();
   const now = new Date();
+  const config = loadConfig();
   return (
     <>
-      <View page={page} templates={templates} tasks={tasks} now={now} />
-      <Refresher stale={isDue(saved, now)} />
+      <View page={page} templates={templates} tasks={tasks} now={now} config={config} />
+      <Refresher stale={isDue(saved, now)} fast={checkingFirstRuns(saved, now)} />
     </>
   );
 }
@@ -56,16 +60,34 @@ function View({
   templates,
   tasks,
   now,
+  config,
 }: {
   page: CompetitorPage;
   templates: ReturnType<typeof loadTemplates>;
   tasks: ReturnType<typeof loadTasks>;
   now: Date;
+  config: ReturnType<typeof loadConfig>;
 }) {
   const { competitor: c, colorIndex } = page;
   const removed = c.status === "removed";
   const pages = page.watches.filter((w) => w.kind !== "news" && w.url).length;
   const base = `/c/${encodeURIComponent(c.slug)}`;
+  // Manage monitors lists the page monitors with what each reports, the same words the Add panel showed.
+  const managed: ManagedMonitor[] = page.watches.flatMap((w) =>
+    w.kind === "news"
+      ? []
+      : [
+          {
+            kind: w.kind,
+            label: w.label,
+            url: w.url,
+            ...(w.page ? { page: w.page } : {}),
+            ...(w.monitorId ? { monitorId: w.monitorId } : {}),
+            reports: w.kind === "page" ? PAGE_INSTRUCTIONS[w.page ?? "other"] : config.instructions[w.kind],
+            settingUp: w.state?.state === "setting_up",
+          },
+        ],
+  );
 
   return (
     <>
@@ -118,26 +140,38 @@ function View({
         >
           <span className="flex flex-wrap items-center gap-1.5">
             {page.watches.map((w) => (
-              <WatchPill key={w.kind} watch={w} domain={c.domain} now={now} />
+              <WatchPill key={`${w.kind}-${w.label}`} watch={w} now={now} company={c.name} newsDays={config.news.everyDays} />
             ))}
           </span>
         </Strip>
       )}
-      {!removed && <BrokenWatches watches={page.watches} />}
+      {!removed && <BrokenWatches watches={page.watches} slug={c.slug} />}
 
       <div className="flex-1">
         <div className="min-w-0">
-          {page.settingUp && !removed && <SettingUp page={page} />}
+          {page.settingUp && !removed && <SetupBox page={page} />}
 
           <nav aria-label="Filter by type" className={`flex flex-wrap items-center gap-1.5 border-b border-rule ${PAD} py-3`}>
-            <Chip href={base} active={!page.kind}>
-              All <Count n={page.counts.all} />
+            <Chip href={base} active={!page.filter}>
+              All <Count n={page.total} />
             </Chip>
-            {(["changelog", "pricing", "news"] as const).map((k) => (
-              <Chip key={k} href={`${base}?k=${k}`} active={page.kind === k}>
-                {CHIP[k]} <Count n={page.counts[k]} />
+            {/* One chip per tag: Features, Pricing, News, then each extra page by its own name, such as Careers. */}
+            {page.filters.map((f) => (
+              <Chip key={f.key} href={`${base}?k=${encodeURIComponent(f.key)}`} active={page.filter === f.key}>
+                {f.label} <Count n={f.count} />
               </Chip>
             ))}
+            {/* The gear opens Manage monitors. On the demo it shows the list, and adding shows how to run your own copy. */}
+            {!removed && (
+              <ManageMonitorsButton
+                slug={c.slug}
+                name={c.name}
+                domain={c.domain}
+                monitors={managed}
+                news={{ on: c.news !== false, everyDays: config.news.everyDays }}
+                demo={isDemo()}
+              />
+            )}
           </nav>
 
           {page.events.length ? (
@@ -154,12 +188,17 @@ function View({
               </div>
               <ShowMore>
                 {page.before.map((e) => (
-                  <div key={e.id} className={`grid grid-cols-[88px_64px_1fr] gap-x-4 border-b border-rule ${PAD} py-3 last:border-b-0`}>
-                    <span className="text-small pt-0.5 text-muted">{shortDate(e.detectedAt)}</span>
-                    <span className="pt-0.5">
-                      <Tag kind={e.kind} />
+                  <div
+                    key={e.id}
+                    className={`grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1.5 border-b border-rule ${PAD} sm:grid-cols-[88px_64px_1fr] sm:gap-x-4 sm:gap-y-0 py-3 last:border-b-0`}
+                  >
+                    <span className="text-small col-start-2 row-start-1 self-center justify-self-end text-muted sm:col-auto sm:row-auto sm:self-auto sm:justify-self-auto sm:pt-0.5">
+                      {shortDate(e.detectedAt)}
                     </span>
-                    <div className="min-w-0">
+                    <span className="col-start-1 row-start-1 sm:col-auto sm:row-auto sm:pt-0.5">
+                      <Tag kind={e.kind} label={e.label} page={e.page} />
+                    </span>
+                    <div className="col-span-2 row-start-2 min-w-0 sm:col-span-1 sm:row-auto">
                       <a href={e.url} target="_blank" rel="noreferrer" className="text-body font-semibold hover:underline">
                         {e.title}
                       </a>
@@ -199,19 +238,21 @@ function EventRow({ event, assess }: { event: CompetitorEvent; assess: ReturnTyp
   const { summary, rows } = whatChanged(event);
   const isNews = event.kind === "news";
   return (
-    <article className={`grid grid-cols-[88px_64px_1fr] items-start gap-x-4 border-b border-rule ${PAD} py-4 max-sm:grid-cols-[64px_1fr]`}>
-      <span className="text-small pt-0.5 text-muted max-sm:hidden">{shortDate(event.detectedAt)}</span>
-      <span className="pt-0.5">
-        <Tag kind={event.kind} />
+    // Phone: tag and date on one line, then the change across the full width. Wider: date, tag and change in columns.
+    <article
+      className={`grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1.5 border-b border-rule ${PAD} sm:grid-cols-[88px_64px_1fr] sm:gap-x-4 sm:gap-y-0 py-4`}
+    >
+      <span className="text-small col-start-2 row-start-1 self-center justify-self-end text-muted sm:col-auto sm:row-auto sm:self-auto sm:justify-self-auto sm:pt-0.5">
+        {shortDate(event.detectedAt)}
       </span>
-      <div className="min-w-0">
+      <span className="col-start-1 row-start-1 sm:col-auto sm:row-auto sm:pt-0.5">
+        <Tag kind={event.kind} label={event.label} page={event.page} />
+      </span>
+      <div className="col-span-2 row-start-2 min-w-0 sm:col-span-1 sm:row-auto">
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
             <h3 className="text-body font-semibold">{event.title}</h3>
-            <p className="text-small mt-0.5 text-muted">
-              <span className="sm:hidden">{shortDate(event.detectedAt)} · </span>
-              {isNews ? hostOf(event.url) : summary}
-            </p>
+            <p className="text-small mt-0.5 text-muted">{isNews ? hostOf(event.url) : summary}</p>
           </div>
           <AssessButton data={assess} />
         </div>
@@ -241,53 +282,62 @@ function EventRow({ event, assess }: { event: CompetitorEvent; assess: ReturnTyp
   );
 }
 
-function SettingUp({ page }: { page: CompetitorPage }) {
-  const news = page.watches.find((w) => w.kind === "news")?.state;
-  const step = (done: boolean | "running", text: string) => (
-    <li className="text-body flex items-center gap-2.5">
-      {done === "running" ? (
-        <span className="ui-spinner text-accent" />
-      ) : done ? (
-        <Check />
-      ) : (
-        <span className="size-3.5 rounded-full border border-edge" />
-      )}
-      {text}
-    </li>
-  );
-  return (
-    <section className={`border-b border-rule ${PAD} py-4`}>
-      <div className="rounded-[8px] border border-dashed border-edge p-4">
-        <h2 className="text-body font-semibold">Getting set up</h2>
-        <p className="text-small mt-0.5 text-muted">The first check saves a copy of each page. Changes show from the next check.</p>
-        <ul className="mt-3 space-y-2">
-          {step(true, "Company details")}
-          {step(true, news?.state === "not_working" ? "News: no news source covers this company yet" : "News, last 90 days")}
-          {step("running", "Running the first checks")}
-        </ul>
-      </div>
-    </section>
-  );
+/** "their changelog", "their pricing page", "their Careers page". */
+const pageName = (w: WatchRow) =>
+  w.kind === "changelog" && w.label === "Changelog"
+    ? "their changelog"
+    : w.kind === "pricing" && w.label === "Pricing"
+      ? "their pricing page"
+      : `their ${w.label} page`;
+
+/** The set-up box for this competitor: full steps while it is new (no page compared yet), else one line per first check. */
+function SetupBox({ page }: { page: CompetitorPage }) {
+  const isNew = !page.compared;
+  const news = page.watches.find((w) => w.kind === "news")?.state ?? null;
+  const steps = setupSteps({
+    isNew,
+    news: news && {
+      state: news.state,
+      noSource: news.state === "not_working" && /news source/.test(news.reason),
+      support: news.state === "not_working" && news.fix === "contact_support",
+    },
+    monitors: page.watches
+      .filter((w) => w.kind !== "news" && w.url && w.state)
+      .map((w) => ({
+        name: pageName(w),
+        label: w.label,
+        state: w.state!.state,
+        support: w.state!.state === "not_working" && w.state!.fix === "contact_support",
+      })),
+  });
+  return <SettingUp isNew={isNew} steps={steps} pad={PAD} />;
 }
 
 function Empty({ page }: { page: CompetitorPage }) {
   const c = page.competitor;
-  let text = page.kind ? `No ${CHIP[page.kind].toLowerCase()} changes since you added ${c.name}.` : `No changes since you added ${c.name}.`;
+  const chosen = page.filters.find((f) => f.key === page.filter);
+  const MAIN: Record<string, string> = { changelog: "feature", pricing: "pricing", news: "news" };
+  let text = !chosen
+    ? `No changes since you added ${c.name}.`
+    : MAIN[chosen.key]
+      ? `No ${MAIN[chosen.key]} changes since you added ${c.name}.`
+      : `No changes on their ${chosen.label} page since you added ${c.name}.`;
   if (!page.compared && c.status === "watching") text = "No changes yet. The first comparison runs within a day of adding.";
   return <p className={`text-body ${PAD} py-6 text-muted`}>{text}</p>;
 }
 
 const FIX: Record<string, string> = {
-  edit_address: "Check that the address still opens.",
-  try_another_page: "Try another page.",
-  wait_for_refill: "Checks resume when your credits refill.",
-  resume: "Fix the cause, then resume the monitor in context.dev.",
+  edit_address: "If the page moved, give its new address.",
+  try_another_page: "Try another page on their site.",
+  // The developer's account ran out (the server log says so): the user can only tell whoever runs the app.
+  contact_support: "Contact support.",
+  resume: "Whoever runs this copy can restart it.",
 };
 
 /** One watch as a small pill: dot, name. Hover for the address and last check. Pages open their page. */
-function WatchPill({ watch, domain, now }: { watch: WatchRow; domain: string; now: Date }) {
+function WatchPill({ watch, now, company, newsDays }: { watch: WatchRow; now: Date; company: string; newsDays: number }) {
   const s = watch.state;
-  const name = KIND_NAME[watch.kind];
+  const name = watch.label;
   const detail = !s
     ? "Not watched"
     : s.state === "working"
@@ -297,7 +347,13 @@ function WatchPill({ watch, domain, now }: { watch: WatchRow; domain: string; no
         : s.state === "unknown"
           ? "Checking status"
           : `Not working: ${s.reason}`;
-  const where = watch.kind === "news" ? `${domain} · daily` : watch.url ? shortUrl(watch.url) : "";
+  // News is our own search, not a page: the card says what it does instead of an address.
+  const where =
+    watch.kind === "news"
+      ? `We search the web ${newsDays === 1 ? "daily" : `every ${newsDays} days`} for news about ${company}.`
+      : watch.url
+        ? shortUrl(watch.url)
+        : "";
   const color = s ? STATE_COLOR[s.state] : "#D5DAE1";
   const pill = (
     <span
@@ -334,37 +390,22 @@ function WatchPill({ watch, domain, now }: { watch: WatchRow; domain: string; no
 }
 
 /** A broken watch is never hidden: one line each under the strip, with the reason and the fix. */
-function BrokenWatches({ watches }: { watches: WatchRow[] }) {
+function BrokenWatches({ watches, slug }: { watches: WatchRow[]; slug: string }) {
   const broken = watches.filter((w) => w.state?.state === "not_working");
   if (!broken.length) return null;
   return (
     <div className={`text-small border-b border-rule border-l-[3px] border-l-warn-edge bg-warn-tint ${PAD} py-2.5 text-warn`}>
       {broken.map((w) =>
         w.state?.state === "not_working" ? (
-          <p key={w.kind}>
-            <span className="font-semibold text-ink">{KIND_NAME[w.kind]} is not working</span>
+          <p key={`${w.kind}-${w.label ?? ""}`}>
+            <span className="font-semibold text-ink">{w.label} is not working</span>
             {w.state.since ? ` since ${shortDate(w.state.since)}` : ""}: {w.state.reason}. {FIX[w.state.fix] ?? ""}
+            {w.monitorId && (w.state.fix === "edit_address" || w.state.fix === "try_another_page") && (
+              <EditAddressButton slug={slug} monitorId={w.monitorId} label={w.label} url={w.url} />
+            )}
           </p>
         ) : null,
       )}
     </div>
-  );
-}
-
-function Check() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="#0E9F6E"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-label="Done"
-    >
-      <path d="M20 6 9 17l-5-5" />
-    </svg>
   );
 }

@@ -1,16 +1,19 @@
 import Link from "next/link";
 import { connection } from "next/server";
 import { loadCompetitors } from "@/lib/competitors";
+import { loadConfig } from "@/lib/config";
 import type { CompetitorEvent } from "@/lib/events";
 import { earliestDay, loadOverview, readFilter, readRange, type OverviewData } from "@/lib/overview";
 import type { Tasks, Templates } from "@/lib/prompt";
 import { loadTasks, loadTemplates } from "@/lib/prompt-templates";
-import { isDue, loadSavedStates, nextRun, REFRESH_EVERY_MS, showStaleWarning, type SavedStates } from "@/lib/refresh";
+import { checkingFirstRuns, isDue, loadSavedStates, nextRun, REFRESH_EVERY_MS, showStaleWarning, type SavedStates } from "@/lib/refresh";
 import { getStore } from "@/lib/store";
-import type { WatchState } from "@/lib/watch-status";
+import type { NamedState, WatchState } from "@/lib/watch-status";
 import { whatChanged } from "@/lib/what-changed";
 import { KIND_NAME } from "./colors";
 import { dateTime, hostOf, relative, shortDate } from "./format";
+import { contextDevLink } from "@/lib/links";
+import { Footer } from "./context-dev";
 import { CompanyMark } from "./mark";
 import { OverviewBoard, type FeedItem } from "./overview-board";
 import { Refresher } from "./refresher";
@@ -56,7 +59,7 @@ export async function Overview({ searchParams }: { searchParams: Params }) {
         initial={{ ...range, filter }}
         earliest={earliest}
       />
-      <Refresher stale={isDue(saved, now)} />
+      <Refresher stale={isDue(saved, now)} fast={checkingFirstRuns(saved, now)} />
     </>
   );
 }
@@ -121,7 +124,7 @@ function OverviewView({
         <Stat>
           Competitors <Value>{rows.length}</Value>
         </Stat>
-        <MonitorsStatus groups={monitorGroups(rows, now)} />
+        <MonitorsStatus groups={monitorGroups(rows, now)} newsEveryDays={loadConfig().news.everyDays} />
       </Strip>
 
       <OverviewBoard
@@ -156,12 +159,7 @@ function OverviewView({
         </section>
       )}
 
-      <footer className={`text-small mt-auto border-t border-rule ${PAD} py-3 text-muted`}>
-        Built with{" "}
-        <a href="https://context.dev" className="underline-offset-2 hover:text-ink hover:underline">
-          context.dev
-        </a>
-      </footer>
+      <Footer />
     </>
   );
 }
@@ -173,13 +171,13 @@ function monitorGroups(rows: OverviewData["rows"], now: Date): MonitorGroup[] {
     name: r.competitor.name,
     logo: r.competitor.logo,
     colorIndex: r.colorIndex,
-    watches: r.watches.map((w) => ({ kind: w.kind, state: w.state, detail: watchDetail(w, now) })),
+    watches: r.watches.map((w) => ({ kind: w.kind, label: w.label ?? KIND_NAME[w.kind], state: w.state, detail: watchDetail(w, now) })),
   }));
 }
 
 /** "Working, checked 3 hours ago", "Pricing not working: the page returns 404." */
-function watchDetail(w: WatchState, now: Date): string {
-  const name = KIND_NAME[w.kind];
+function watchDetail(w: NamedState, now: Date): string {
+  const name = w.label ?? KIND_NAME[w.kind];
   if (w.state === "working")
     return `${name}: ${w.compared === false ? "ready, first comparison within a day" : "working"}${w.lastChecked ? `, checked ${relative(w.lastChecked, now)}` : ""}`;
   if (w.state === "setting_up") return `${name}: first check running`;
@@ -222,6 +220,8 @@ function feedItem(e: CompetitorEvent, colorIndex: number, logo: string | null, t
     logo,
     colorIndex,
     kind: e.kind,
+    ...(e.label ? { label: e.label } : {}),
+    ...(e.page ? { page: e.page } : {}),
     title: e.title,
     url: e.url,
     day: e.detectedAt.slice(0, 10),
@@ -239,21 +239,22 @@ function feedItem(e: CompetitorEvent, colorIndex: number, logo: string | null, t
 }
 
 const FIX_TEXT: Record<string, string> = {
-  edit_address: "Check that the address still opens.",
-  try_another_page: "Try another page.",
-  wait_for_refill: "Checks resume when your credits refill.",
+  edit_address: "Open the competitor to edit its address.",
+  try_another_page: "Open the competitor to pick another page.",
+  // The developer's account ran out (the server log says so): the user can only tell whoever runs the app.
+  contact_support: "Contact support.",
   resume: "Fix the cause, then resume the monitor.",
 };
 
-function StatusLine({ watches, className = "" }: { watches: WatchState[]; className?: string }) {
+function StatusLine({ watches, className = "" }: { watches: NamedState[]; className?: string }) {
   return (
     <div
       className={`${className} text-small flex flex-col justify-center gap-0.5 border-l-[3px] border-l-warn-edge bg-warn-tint px-3 py-2.5 text-warn`}
     >
       {watches.map((w) =>
         w.state === "not_working" ? (
-          <p key={w.kind}>
-            <span className="font-semibold text-ink">{KIND_NAME[w.kind]} is not working</span>
+          <p key={`${w.kind}-${w.label ?? ""}`}>
+            <span className="font-semibold text-ink">{w.label ?? KIND_NAME[w.kind]} is not working</span>
             {w.since ? (
               <>
                 {" "}
@@ -303,7 +304,7 @@ function SetupStep({ problem }: { problem: "no_store" | "no_key" }) {
         <p className="text-body mt-3 max-w-[600px] text-copy">
           Add your context.dev API key to <code>.env</code> as <code>CONTEXT_DEV_API_KEY</code>, then restart the app. A restricted key needs Data
           APIs (use) and Monitors (manage).{" "}
-          <a className="text-accent hover:underline" href="https://context.dev">
+          <a className="text-accent hover:underline" href={contextDevLink("setup")}>
             Get a free key at context.dev
           </a>
           .

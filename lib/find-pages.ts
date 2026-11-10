@@ -5,6 +5,7 @@
  * e2b.dev/changelog redirects to /product-updates (accept), changelog.daytona.io redirects to the home page (reject).
  */
 import { lookup } from "node:dns/promises";
+import { guessPage, type PageType } from "./page-types";
 import { isIP } from "node:net";
 
 export type PageKind = "pricing" | "changelog";
@@ -55,7 +56,11 @@ function isMainSite(url: URL, domain: string): boolean {
 export function accepts(kind: PageKind, url: URL, domain: string): boolean {
   if (!onSite(url, domain)) return false;
   const segments = url.pathname.split("/").filter(Boolean);
-  const last = segments.at(-1)?.toLowerCase().replace(/\.(html?|md)$/, "") ?? "";
+  const last =
+    segments
+      .at(-1)
+      ?.toLowerCase()
+      .replace(/\.(html?|md)$/, "") ?? "";
   if (LAST_SEGMENT[kind].test(last)) return true;
   // A changelog site of its own, such as changelog.acme.com. Not the main site's home page.
   return kind === "changelog" && segments.length === 0 && bareHost(url.hostname) === `changelog.${domain}`;
@@ -108,7 +113,10 @@ export function isPrivateAddress(ip: string): boolean {
   if (isIP(v4) === 4) {
     const [a, b] = v4.split(".").map(Number);
     return (
-      a === 0 || a === 10 || a === 127 || a >= 224 ||
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      a >= 224 ||
       (a === 100 && b >= 64 && b <= 127) ||
       (a === 169 && b === 254) ||
       (a === 172 && b >= 16 && b <= 31) ||
@@ -163,4 +171,53 @@ export async function checkAddress(input: string, fetchHop: FetchHop = webHop): 
   }
   const final = await resolve(url, fetchHop);
   return final ? final.href : null;
+}
+
+/** Pages worth an extra monitor, beyond the pricing page and changelog. kind sets the event type their changes get. */
+const MORE: { path: string; label: string }[] = [
+  { path: "/enterprise", label: "Enterprise" },
+  { path: "/product", label: "Product" },
+  { path: "/features", label: "Features" },
+  { path: "/integrations", label: "Integrations" },
+  { path: "/customers", label: "Customers" },
+  { path: "/compare", label: "Comparisons" },
+  { path: "/security", label: "Security" },
+  { path: "/blog", label: "Blog" },
+  { path: "/careers", label: "Careers" },
+];
+
+/** A suggested extra page. kind and page come from its address (guessPage), so Careers is a careers page, not a Feature. */
+export type MorePage = { kind: PageKind | "page"; url: string; label: string; page?: PageType };
+
+/** An extra page from its address and name: its type and, for other pages, which kind of page. */
+export function morePage(url: string, label: string): MorePage {
+  const guess = guessPage(url);
+  return guess.kind === "page" ? { kind: "page", url, label, page: guess.page } : { kind: guess.kind, url, label };
+}
+
+/**
+ * Recommended extra pages for Add more monitors: the other pricing pages and changelogs the scan found, then the
+ * common pages above that open on their own site at the same path (a redirect to the home page does not count).
+ * Free: plain requests to their site. Never the pages already chosen.
+ */
+export async function findMorePages(domain: string, found: FoundPages | null, chosen: string[], fetchHop: FetchHop = webHop): Promise<MorePage[]> {
+  const site = bareHost(domain);
+  const taken = new Set(chosen.map((u) => key(new URL(u))));
+  const out: MorePage[] = [];
+  const add = (page: MorePage) => {
+    const k = key(new URL(page.url));
+    if (taken.has(k)) return;
+    taken.add(k);
+    out.push(page);
+  };
+  for (const kind of ["pricing", "changelog"] as const) {
+    for (const url of found?.[kind]?.others ?? [])
+      add({ kind, url, label: `${kind === "pricing" ? "Pricing" : "Changelog"} · ${bareHost(new URL(url).hostname)}` });
+  }
+  const finals = await Promise.all(MORE.map((m) => resolve(new URL(`https://${site}${m.path}`), fetchHop)));
+  MORE.forEach((m, i) => {
+    const url = finals[i];
+    if (url && onSite(url, site) && url.pathname.replace(/\/$/, "") === m.path) add(morePage(url.href, m.label));
+  });
+  return out;
 }

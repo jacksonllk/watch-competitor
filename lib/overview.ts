@@ -2,13 +2,13 @@
  * The Overview's data: every saved change of every watched competitor, and each watch's state.
  * Reads the store only. The page picks the range to show. Days are UTC.
  */
-import type { CompetitorRecord } from "./competitors";
+import { allWatches, type CompetitorRecord } from "./competitors";
 import { articleToEvent, toEvent, type CompetitorEvent } from "./events";
 import { historyToEvent, loadHistory } from "./changelog-history";
 import { newsCheckKey, newsKey, oneStoryEach, relevantArticles, type Article, type NewsCheck } from "./news";
 import type { Store } from "./store/types";
 import { loadChanges } from "./sync";
-import { newsState, type WatchState } from "./watch-status";
+import { newsState, type NamedState, type WatchState } from "./watch-status";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const addDays = (day: string, n: number) => new Date(Date.parse(`${day}T00:00:00Z`) + n * DAY_MS).toISOString().slice(0, 10);
@@ -62,7 +62,7 @@ export function isShown(event: CompetitorEvent): boolean {
 export async function loadEvents(store: Store, competitor: CompetitorRecord, options: { earlierNews?: boolean } = {}): Promise<CompetitorEvent[]> {
   const [changes, articles, history] = await Promise.all([
     loadChanges(store, competitor.slug),
-    store.get<Article[]>(newsKey(competitor.slug)).then((a) => oneStoryEach(relevantArticles(a ?? [], competitor.name, competitor.domain).articles)),
+    store.get<Article[]>(newsKey(competitor.slug)).then((a) => oneStoryEach(relevantArticles(a ?? [], competitor.name, competitor.domain).articles, competitor.name)),
     options.earlierNews ? loadHistory(store, competitor.slug) : Promise.resolve([]),
   ]);
   const events = [
@@ -78,7 +78,7 @@ export async function loadEvents(store: Store, competitor: CompetitorRecord, opt
 export type CompetitorRow = {
   competitor: CompetitorRecord;
   colorIndex: number;
-  watches: WatchState[];
+  watches: NamedState[];
 };
 
 export type OverviewData = {
@@ -95,10 +95,10 @@ export async function loadOverview(store: Store, competitors: CompetitorRecord[]
   const rows: CompetitorRow[] = await Promise.all(
     watching.map(async (competitor, colorIndex) => {
       const check = await store.get<NewsCheck>(newsCheckKey(competitor.slug));
-      const watches: WatchState[] = [];
-      for (const kind of ["changelog", "pricing"] as const) {
-        const watch = competitor.watches[kind];
-        if (watch) watches.push(monitorStates.get(watch.monitorId) ?? { kind, state: "unknown", reason: "not read yet" });
+      const watches: NamedState[] = [];
+      for (const w of allWatches(competitor)) {
+        const state = monitorStates.get(w.monitorId) ?? { kind: w.kind, state: "unknown" as const, reason: "not read yet" };
+        watches.push({ ...state, label: w.label });
       }
       if (competitor.news !== false) watches.push(newsState(check));
       return { competitor, colorIndex, watches };

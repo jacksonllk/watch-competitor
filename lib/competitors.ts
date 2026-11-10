@@ -1,9 +1,20 @@
 /** The competitors a user watches, saved in the store under `competitors`. */
 import type { Competitor } from "./events";
 import type { PageKind } from "./find-pages";
+import type { PageType } from "./page-types";
 import type { Store } from "./store/types";
 
 export type Watch = { url: string; monitorId: string; addedAt: string };
+
+/**
+ * A page watched on top of the pricing page and changelog, picked in Add more monitors. kind sets its event type:
+ * pricing, changelog, or "page" with page saying which kind (careers, customers…). label is its tag, such as "Careers".
+ */
+export type ExtraWatch = Watch & { kind: MonitorKind; label: string; page?: PageType; removedAt?: string };
+export type MonitorKind = PageKind | "page";
+
+/** The name each main watch shows. Extra watches carry their own, such as "Blog". */
+export const MAIN_LABEL: Record<PageKind, string> = { changelog: "Changelog", pricing: "Pricing" };
 
 export type CompetitorRecord = Competitor & {
   logo: string | null;
@@ -16,7 +27,21 @@ export type CompetitorRecord = Competitor & {
   status: "watching" | "removed";
   removedAt: string | null;
   watches: Partial<Record<PageKind, Watch>>;
+  /** Extra pages, each its own monitor. Missing on competitors added before 10 Nov. */
+  extra?: ExtraWatch[];
 };
+
+/**
+ * Every monitor of a competitor: its changelog and pricing page, then the extra pages.
+ * A removed extra page stays on the record, so its old changes keep their name, but it is not a monitor any more.
+ */
+export function allWatches(c: Pick<CompetitorRecord, "watches" | "extra">): ExtraWatch[] {
+  const main = (["changelog", "pricing"] as const).flatMap((kind) => {
+    const w = c.watches[kind];
+    return w ? [{ ...w, kind, label: MAIN_LABEL[kind] }] : [];
+  });
+  return [...main, ...(c.extra ?? []).filter((w) => !w.removedAt)];
+}
 
 const KEY = "competitors";
 

@@ -3,7 +3,7 @@ import { loadConfig } from "@/lib/config";
 import { normalizeDomain, previewCompany } from "@/lib/preview";
 import { jsonBody, setup, setupError, text } from "@/lib/server";
 
-/** Description, 90 days of news and the pages found on the site. Also the free monitor slot count and the base instructions. */
+/** Description, 90 days of news and the pages found on the site. Also the free monitor slot count, the base instructions and how often news is searched. */
 export async function POST(request: Request) {
   const ready = setup();
   if (!ready.ok) return setupError(ready.problem);
@@ -15,10 +15,12 @@ export async function POST(request: Request) {
     Promise.resolve(ready.api.monitors.getLimits()).catch(() => null),
     loadCompetitors(ready.store),
   ]);
+  const config = loadConfig();
   const watching = competitors.some((c) => c.domain === normalizeDomain(domain) && c.status === "watching");
   return Response.json({
     ...result,
-    instructions: loadConfig().instructions,
+    instructions: config.instructions,
+    newsEveryDays: config.news.everyDays,
     watching,
     monitors: limits ? { used: limits.monitors_used, limit: limits.monitors_limit } : null,
   });

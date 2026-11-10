@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { CompetitorView } from "@/app/ui/competitor-view";
+import { Footer } from "@/app/ui/context-dev";
 import { Shell } from "@/app/ui/shell";
 import { isDemo } from "@/lib/links";
 
@@ -10,12 +11,7 @@ export default function Page({ params, searchParams }: PageProps<"/c/[slug]">) {
         <Suspense fallback={<Loading />}>
           <CompetitorView params={params} searchParams={searchParams} />
         </Suspense>
-        <footer className="text-small mt-auto border-t border-rule px-(--gutter) py-3 text-muted">
-          Built with{" "}
-          <a href="https://context.dev" className="underline-offset-2 hover:text-ink hover:underline">
-            context.dev
-          </a>
-        </footer>
+        <Footer />
       </main>
     </Shell>
   );

@@ -1,5 +1,7 @@
 /** What every route and page needs: the store, the context.dev client and the settings file. Server only. */
 import { liveApi, type ContextApi } from "./context";
+import { checkAddress, morePage, webHop, type FetchHop } from "./find-pages";
+import { PAGE_INSTRUCTIONS, type PageType } from "./page-types";
 import { getStore, type StoreChoice } from "./store";
 
 export function contextApi(): ContextApi | null {
@@ -36,3 +38,31 @@ export async function jsonBody(request: Request): Promise<Record<string, unknown
 }
 
 export const text = (value: unknown, max = 500): string => (typeof value === "string" ? value.slice(0, max) : "");
+
+/** The most extra pages one request can add. */
+export const MAX_MORE = 8;
+
+export type MoreRead =
+  | { ok: true; pages: { kind: "pricing" | "changelog" | "page"; url: string; label: string; page?: PageType }[] }
+  | { ok: false; label: string | null };
+
+/**
+ * Extra pages sent by the browser (Add more monitors): up to MAX_MORE, each address checked again (free).
+ * A page that no longer opens stops the request with its name. A missing or unknown type is read from the address.
+ */
+export async function readMorePages(raw: unknown, fetchHop: FetchHop = webHop): Promise<MoreRead> {
+  const pages: Extract<MoreRead, { ok: true }>["pages"] = [];
+  for (const item of Array.isArray(raw) ? raw.slice(0, MAX_MORE) : []) {
+    const page = (item ?? {}) as Record<string, unknown>;
+    const label = text(page.label, 40).trim();
+    if (!label) return { ok: false, label: null };
+    const url = typeof page.url === "string" ? await checkAddress(page.url, fetchHop) : null;
+    if (!url) return { ok: false, label };
+    const kind = page.kind;
+    const type = typeof page.page === "string" && page.page in PAGE_INSTRUCTIONS ? (page.page as PageType) : null;
+    if (kind === "pricing" || kind === "changelog") pages.push({ kind, url, label });
+    else if (kind === "page" && type) pages.push({ kind, url, label, page: type });
+    else pages.push(morePage(url, label));
+  }
+  return { ok: true, pages };
+}

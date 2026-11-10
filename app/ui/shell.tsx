@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createContext, Suspense, useContext, useState, type ReactNode } from "react";
@@ -78,12 +79,7 @@ export function AddButton() {
   );
 }
 
-/** Two overlapping squares: one competitor seen against another. */
+/** A magnifying glass over a target: watching competitors closely. public/logo.svg, drawn from public/competitor-watch-logo.png. */
 function Logo() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 18 18" aria-hidden>
-      <rect x="1" y="1" width="10" height="10" rx="2" fill="#1B2430" />
-      <rect x="7" y="7" width="10" height="10" rx="2" fill="none" stroke="#1B2430" strokeWidth="1.5" />
-    </svg>
-  );
+  return <Image src="/logo.svg" alt="" width={24} height={24} priority />;
 }

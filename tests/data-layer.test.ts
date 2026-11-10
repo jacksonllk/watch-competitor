@@ -1,3 +1,4 @@
+import type { Article } from "@/lib/news";
 import { describe, expect, it } from "vitest";
 import { addCompetitor } from "@/lib/add-competitor";
 import { loadCompetitors, slugFor, type CompetitorRecord } from "@/lib/competitors";
@@ -49,8 +50,12 @@ describe("watches", () => {
   it("deletes every monitor of a removed competitor", async () => {
     const { api, deleted } = fakeContext();
     const watch = { url: "x", addedAt: "y" };
-    await stopWatches(api.monitors, { ...acme, watches: { pricing: { ...watch, monitorId: "mon_a" }, changelog: { ...watch, monitorId: "mon_b" } } });
-    expect(deleted).toEqual(["mon_a", "mon_b"]);
+    await stopWatches(api.monitors, {
+      ...acme,
+      watches: { pricing: { ...watch, monitorId: "mon_a" }, changelog: { ...watch, monitorId: "mon_b" } },
+      extra: [{ ...watch, monitorId: "mon_c", kind: "changelog", label: "Blog" }],
+    });
+    expect(deleted.sort()).toEqual(["mon_a", "mon_b", "mon_c"]);
   });
 });
 
@@ -200,25 +205,35 @@ describe("one article per story", () => {
   it("treats the same day and a similar title as the same story", async () => {
     const { keepArticles } = await import("@/lib/news");
     const base = { ...fixtureNewsSearch.data[0], published_at: "2026-11-05T10:00:00Z" };
-    const a = {
-      ...base,
-      id: "a",
-      story_id: "s1",
-      title: "E2B, Which Gives AI Agents Their Own Cloud Computers, Passes $120 Million in Annualized Run Rate",
-    };
-    const b = {
-      ...base,
-      id: "b",
-      story_id: "s2",
-      title: "E2B, Which Gives AI Agents Their Own Cloud Computers, Passes $120 Million in Annual Recurring Revenue",
-    };
+    const a = { ...base, id: "a", story_id: "s1", title: "Acme Notes, Which Writes Meeting Notes for Teams, Passes $12 Million in Annual Revenue" };
+    const b = { ...base, id: "b", story_id: "s2", title: "Acme Notes, Which Writes Meeting Notes for Teams, Passes $12 Million in Yearly Sales" };
     const c = {
       ...base,
       id: "c",
       story_id: "s3",
-      published_at: "2026-11-06T10:00:00Z",
-      title: "E2B, Which Gives AI Agents Their Own Cloud Computers, Passes a milestone",
+      published_at: "2026-11-30T10:00:00Z",
+      title: "Acme Notes, Which Writes Meeting Notes for Teams, Opens in Berlin",
     };
-    expect(keepArticles([], [a, b, c]).map((x) => x.id)).toEqual(["c", "a"]);
+    // a and b: one story. c: weeks later, a different story.
+    expect(keepArticles([], [a, b, c], "Acme Notes").map((x) => x.id)).toEqual(["c", "a"]);
+  });
+});
+
+describe("one story, many outlets", () => {
+  const at = (id: string, title: string, day: string, story = id) =>
+    ({ ...fixtureNewsSearch.data[0], id, story_id: story, title, published_at: `${day}T08:00:00Z` }) as Article;
+
+  it("merges headlines about the same round over a few days, and keeps different news apart", async () => {
+    const { oneStoryEach } = await import("@/lib/news");
+    const articles = [
+      at("a", "Acme Notes Raises $20M at $500M Valuation to Rethink Meeting Notes", "2026-10-23"),
+      at("b", "Meeting startup Acme Notes hits $500M valuation backed by Seedcamp", "2026-10-23"),
+      at("c", "Acme Notes raises $20M at $500M valuation to build notes for teams", "2026-10-21"),
+      at("d", "Acme Notes opens an office in London", "2026-10-22"),
+      at("f", "Acme Notes hits $500M valuation with a $20M Series B", "2026-10-19"),
+      at("e", "Acme Notes raises $20M more, now at $900M valuation", "2026-12-20"),
+    ];
+    // f is 4 days before a, but matches c, which is in a's story.
+    expect(oneStoryEach(articles, "Acme Notes").map((x) => x.id)).toEqual(["a", "d", "e"]);
   });
 });

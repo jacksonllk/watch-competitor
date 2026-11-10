@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { addCompetitor } from "@/lib/add-competitor";
 import { DEFAULT_CONFIG, mergeConfig } from "@/lib/config";
-import { checkAddress } from "@/lib/find-pages";
+import { checkAddress, findMorePages } from "@/lib/find-pages";
 import { fixtureNewsSearch } from "@/lib/fixtures/preview";
 import { newsCheckKey, newsKey, type NewsCheck } from "@/lib/news";
 import { capKey, dailyCap, looksLikeDomain, normalizeDomain, previewCompany, previewKey, searchCompanies } from "@/lib/preview";
@@ -205,5 +205,109 @@ describe("news about another company", () => {
     if (result.status !== "added") return;
     expect(result.competitor.news).toBeUndefined();
     expect(await store.get(newsKey(result.competitor.slug))).toEqual([]);
+  });
+});
+
+describe("Add more monitors", () => {
+  it("recommends the other pages the scan found and common pages at their own path, never a chosen page", async () => {
+    const hop = async (url: URL) => {
+      if (url.href === "https://acme-notes.example/features") return { status: 200, location: null };
+      if (url.href === "https://acme-notes.example/blog") return { status: 301, location: "/blog/" };
+      if (url.href === "https://acme-notes.example/blog/") return { status: 200, location: null };
+      // A redirect to the home page is not an enterprise page.
+      if (url.href === "https://acme-notes.example/enterprise") return { status: 302, location: "/" };
+      if (url.href === "https://acme-notes.example/") return { status: 200, location: null };
+      return { status: 404, location: null };
+    };
+    const found = {
+      pricing: { url: "https://acme-notes.example/pricing", others: ["https://docs.acme-notes.example/pricing"] },
+      changelog: null,
+    };
+    const pages = await findMorePages(
+      "acme-notes.example",
+      found,
+      ["https://acme-notes.example/pricing", "https://acme-notes.example/features"],
+      hop,
+    );
+    expect(pages).toEqual([
+      { kind: "pricing", url: "https://docs.acme-notes.example/pricing", label: "Pricing · docs.acme-notes.example" },
+      { kind: "page", url: "https://acme-notes.example/blog/", label: "Blog", page: "blog" },
+    ]);
+  });
+
+  it("creates a monitor for each extra page and counts them against the plan", async () => {
+    const store = createMemoryStore();
+    const { api, created } = fakeContext();
+    const more = [{ kind: "changelog" as const, url: "https://acme-notes.example/blog", label: "Blog" }];
+    const result = await addCompetitor(
+      store,
+      api,
+      { domain: "acme-notes.example", pages: { pricing: "https://acme-notes.example/pricing", changelog: null }, more },
+      { now },
+    );
+    expect(result.status).toBe("added");
+    if (result.status !== "added") return;
+    expect(created.map((c) => c.name)).toEqual(["Acme Notes · pricing", "Acme Notes · Blog"]);
+    expect(created[1].tags).toContain("kind:changelog");
+    expect(result.competitor.extra).toEqual([expect.objectContaining({ kind: "changelog", label: "Blog", url: "https://acme-notes.example/blog" })]);
+    expect(result.firstChecks).toBe(2);
+  });
+});
+
+describe("extra page types", () => {
+  it("types a page from the words in its address", async () => {
+    const { guessPage } = await import("@/lib/page-types");
+    expect(guessPage("https://acme.example/careers")).toEqual({ kind: "page", page: "careers" });
+    expect(guessPage("https://jobs.acme.example/")).toEqual({ kind: "page", page: "careers" });
+    expect(guessPage("https://acme.example/customers/stories")).toEqual({ kind: "page", page: "customers" });
+    expect(guessPage("https://trust.acme.example/")).toEqual({ kind: "page", page: "security" });
+    expect(guessPage("https://acme.example/vs/beta")).toEqual({ kind: "page", page: "compare" });
+    expect(guessPage("https://acme.example/enterprise")).toEqual({ kind: "pricing" });
+    expect(guessPage("https://acme.example/integrations")).toEqual({ kind: "changelog" });
+    expect(guessPage("https://acme.example/partners")).toEqual({ kind: "page", page: "other" });
+  });
+
+  it("gives an extra page the instruction for its kind of page", async () => {
+    const { monitorParams } = await import("@/lib/watches");
+    const competitor = {
+      slug: "acme",
+      name: "Acme",
+      domain: "acme.example",
+      logo: null,
+      description: null,
+      focus: null,
+      addedAt: "",
+      status: "watching" as const,
+      removedAt: null,
+      watches: {},
+    };
+    const careers = monitorParams(competitor, "page", "https://acme.example/careers", {}, "Careers", "careers");
+    expect(careers.name).toBe("Acme · Careers");
+    expect((careers.target as { instructions: string }).instructions).toMatch(/^Report job openings/);
+    expect(careers.tags).toContain("kind:page");
+  });
+
+  it("offers each kind of page its own tasks", async () => {
+    const { tasksFor } = await import("@/lib/prompt");
+    const { loadTasks } = await import("@/lib/prompt-templates");
+    const base = {
+      id: "x",
+      competitor: { slug: "acme", name: "Acme", domain: "acme.example" },
+      title: "",
+      summary: "",
+      detectedAt: "2026-11-10T00:00:00Z",
+      url: "",
+      importance: null,
+      before: null,
+      after: null,
+      diff: null,
+      excerpt: null,
+    };
+    const tasks = loadTasks();
+    const ids = (page: "customers" | "careers" | "compare") => tasksFor({ ...base, kind: "page", label: "X", page }, tasks).map((t) => t.id);
+    expect(ids("customers")).toEqual(["assess", "outreach", "comparison", "sales", "team"]);
+    expect(ids("careers")).toEqual(["assess", "sales", "team"]);
+    expect(ids("compare")).toEqual(["assess", "claims", "comparison", "sales", "team"]);
+    expect(tasksFor({ ...base, kind: "page", label: "Careers", page: "careers" }, tasks)[0].instruction).toContain("their Careers page");
   });
 });

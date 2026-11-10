@@ -1,7 +1,13 @@
 /** Public links shown in the app. Fill REPO_URL when the repo is public: the demo's "run your own copy" card links to it. */
 export const REPO_URL = "";
 export const SELF_HOST_URL = REPO_URL ? `${REPO_URL}#deploy-your-own` : "";
-export const CONTEXT_SIGNUP_URL = "https://context.dev";
+/** Where a context.dev link sits in the app, so its visits trace to this project. */
+export type LinkSpot = "footer" | "demo_card" | "setup";
+
+/** A link to context.dev tagged with this project and the spot it sits in. No visitor data goes in it. */
+export function contextDevLink(spot: LinkSpot): string {
+  return `https://context.dev/?utm_source=competitor-watch&utm_medium=${spot}&utm_campaign=open-source`;
+}
 /**
  * One-click deploy, for the one host we deploy and test ourselves (Vercel). Always shown next to "Other hosts".
  * Vercel's Deploy button (docs: vercel.com/docs/deploy-button/source): repository-url to clone, env to ask for the key,

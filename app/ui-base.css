@@ -256,6 +256,18 @@ html.ui-resizing * {
   animation: ui-spin 0.7s linear infinite;
 }
 
+/*
+ * A button that swaps its label for a spinner keeps the spinner centred, not sitting on the text baseline.
+ * In the components layer, so a button's own display utilities (flex, w-full) still win.
+ */
+@layer components {
+  button:has(> .ui-spinner) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
 /* Small notice in the bottom right that leaves on its own. */
 @keyframes ui-toast-in {
   from {

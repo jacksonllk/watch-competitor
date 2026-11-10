@@ -3,7 +3,8 @@ import { addCompetitor, FOCUS_LIMIT } from "@/lib/add-competitor";
 import { loadConfig } from "@/lib/config";
 import { failureOf } from "@/lib/context";
 import { checkAddress, type PageKind } from "@/lib/find-pages";
-import { jsonBody, setup, setupError, text } from "@/lib/server";
+import { watchForResults } from "@/lib/refresh";
+import { jsonBody, readMorePages, setup, setupError, text } from "@/lib/server";
 import { webhookUrl } from "@/lib/webhook";
 
 /**
@@ -31,18 +32,25 @@ export async function POST(request: Request) {
     }
   }
 
+  // Extra pages from Add more monitors, each checked again. A page that no longer opens stops the add.
+  const read = await readMorePages(body?.more);
+  if (!read.ok) return Response.json(read.label ? { status: "page_not_found", label: read.label } : { status: "failed" }, { status: 400 });
+  const more = read.pages;
+
   try {
     const config = loadConfig();
     const result = await addCompetitor(
       ready.store,
       ready.api,
-      { domain, focus: text(body?.focus, FOCUS_LIMIT), pages, news: body?.news !== false },
+      { domain, focus: text(body?.focus, FOCUS_LIMIT), pages, more, news: body?.news !== false },
       {
         instructions: config.instructions,
         schedule: config.schedule,
         webhookUrl: webhookUrl(),
       },
     );
+    // Read every 15 seconds until the first checks are done, so the competitor page shows them within seconds.
+    if (result.status === "added") await watchForResults(ready.store, new Date(), { firstChecks: true });
     return Response.json(result);
   } catch (error) {
     const failure = failureOf(error);

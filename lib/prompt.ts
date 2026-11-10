@@ -5,6 +5,7 @@
  * The prompt holds exactly what the panel shows, nothing more.
  */
 import type { CompetitorEvent, EventKind } from "./events";
+import type { PageType } from "./page-types";
 import { oneLine, rowText, whatChanged } from "./what-changed";
 
 export type Templates = Record<EventKind, string>;
@@ -14,6 +15,8 @@ export type Task = {
   id: string;
   /** Shown in the panel and used as the task's name in the prompt. Reads after "Also ask it to". */
   label: string;
+  /** Extra pages only: the kinds of page this task is offered for, such as ["customers"]. Missing: every kind. */
+  for?: PageType[];
   /** Assess only: the one line the panel shows to say what the prompt always asks. */
   outcome?: string;
   instruction: string;
@@ -26,7 +29,12 @@ export const TYPE_LABEL: Record<EventKind, string> = {
   pricing: "Pricing change",
   changelog: "New feature",
   news: "News",
+  page: "Page change",
 };
+
+/** The Type line: "Change on their Careers page" for an extra page, else the type's name. */
+const typeOf = (event: CompetitorEvent) =>
+  event.kind === "page" && event.label ? `Change on their ${oneLine(event.label)} page` : TYPE_LABEL[event.kind];
 
 /** Most characters of competitor text in the prompt. */
 export const CHANGES_LIMIT = 1500;
@@ -62,7 +70,7 @@ export function buildFrame(event: CompetitorEvent, templates: Templates): Frame 
   const values: Record<string, string> = {
     name: oneLine(event.competitor.name),
     domain: oneLine(event.competitor.domain),
-    type: TYPE_LABEL[event.kind],
+    type: typeOf(event),
     detected: usDate(event.detectedAt),
     source: oneLine(event.url),
     changes: changesBlock(event),
@@ -83,9 +91,9 @@ export function buildFrame(event: CompetitorEvent, templates: Templates): Frame 
   return at < 0 ? { before: fill(lines), after: "" } : { before: fill(lines.slice(0, at)), after: fill(lines.slice(at + 1)) };
 }
 
-/** A task with the competitor's name filled in. */
-export function nameTask(task: Task, name: string): Task {
-  const fill = (text: string) => text.replaceAll("{{name}}", oneLine(name));
+/** A task with the competitor's name, and for an extra page its name, filled in. */
+export function nameTask(task: Task, name: string, page = "their"): Task {
+  const fill = (text: string) => text.replaceAll("{{name}}", oneLine(name)).replaceAll("{{page}}", oneLine(page));
   return { ...task, label: fill(task.label), outcome: task.outcome && fill(task.outcome), instruction: fill(task.instruction) };
 }
 
@@ -98,8 +106,15 @@ export function renderTasks(tasks: Task[], chosen: Iterable<string>): string {
 /** The whole prompt for a change, with the chosen tasks (Assess is always in). */
 export function buildPrompt(event: CompetitorEvent, templates: Templates, tasks: Tasks, chosen: Iterable<string> = []): string {
   const frame = buildFrame(event, templates);
-  const list = tasks[event.kind].map((t) => nameTask(t, event.competitor.name));
+  const list = tasksFor(event, tasks);
   return joinPrompt(frame, renderTasks(list, chosen));
+}
+
+/** The tasks offered for one change: its type's list, narrowed to its kind of page, with names filled in. */
+export function tasksFor(event: CompetitorEvent, tasks: Tasks): Task[] {
+  return tasks[event.kind]
+    .filter((t) => !t.for || (event.page !== undefined && t.for.includes(event.page)))
+    .map((t) => nameTask(t, event.competitor.name, event.label ?? "their"));
 }
 
 export function joinPrompt(frame: Frame, tasks: string): string {

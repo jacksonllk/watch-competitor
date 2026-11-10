@@ -4,7 +4,8 @@
  */
 import type { MonitorCreateParams } from "context.dev/resources";
 import { APP_TAG, recordCall, USAGE_ROW, type MonitorsApi, type Usage } from "./context";
-import type { CompetitorRecord, Watch } from "./competitors";
+import { allWatches, type CompetitorRecord, type ExtraWatch, type MonitorKind, type Watch } from "./competitors";
+import { PAGE_INSTRUCTIONS, type PageType } from "./page-types";
 import { DEFAULT_CONFIG, type Schedule } from "./config";
 import type { PageKind } from "./find-pages";
 
@@ -22,12 +23,24 @@ export function webhookParams(url: string) {
   return { url, events: ["run.completed" as const], retry: {} };
 }
 
-export function monitorParams(competitor: CompetitorRecord, kind: PageKind, url: string, options: MonitorOptions = {}): MonitorCreateParams {
+/** An extra page to watch: its event type, its address and the short name it shows, such as "Blog". */
+export type ExtraPage = { kind: MonitorKind; url: string; label: string; page?: PageType };
+
+export function monitorParams(
+  competitor: CompetitorRecord,
+  kind: MonitorKind,
+  url: string,
+  options: MonitorOptions = {},
+  label: string = kind,
+  page?: PageType,
+): MonitorCreateParams {
   const base = options.instructions ?? DEFAULT_CONFIG.instructions;
   const schedule = options.schedule ?? DEFAULT_CONFIG.schedule;
-  const instructions = [base[kind], competitor.focus].filter(Boolean).join(" ");
+  // Extra pages get the instruction for their kind of page, such as careers. The user's focus follows.
+  const sentence = kind === "page" ? PAGE_INSTRUCTIONS[page ?? "other"] : base[kind];
+  const instructions = [sentence, competitor.focus].filter(Boolean).join(" ");
   return {
-    name: `${competitor.name} · ${kind}`,
+    name: `${competitor.name} · ${label}`,
     target: { type: "page", url, instructions },
     change_detection: { type: "semantic" },
     schedule: { type: "interval", frequency: schedule.every, unit: schedule.unit },
@@ -47,23 +60,29 @@ export async function startWatches(
   now: string,
   usage: Usage = {},
   options: MonitorOptions = {},
-): Promise<{ watches: Partial<Record<PageKind, Watch>>; secrets: Record<string, string> }> {
+  extraPages: ExtraPage[] = [],
+): Promise<{ watches: Partial<Record<PageKind, Watch>>; extra: ExtraWatch[]; secrets: Record<string, string> }> {
   const watches: Partial<Record<PageKind, Watch>> = {};
+  const extra: ExtraWatch[] = [];
   const secrets: Record<string, string> = {};
+  const create = async (kind: MonitorKind, url: string, label: string, page?: PageType) => {
+    const monitor = await api.create(monitorParams(competitor, kind, url, options, label, page));
+    recordCall(usage, USAGE_ROW.createMonitor, monitor);
+    if (monitor.webhook?.secret) secrets[monitor.id] = monitor.webhook.secret;
+    return { url, monitorId: monitor.id, addedAt: now };
+  };
   for (const kind of ["pricing", "changelog"] as const) {
     const url = pages[kind];
-    if (!url) continue;
-    const monitor = await api.create(monitorParams(competitor, kind, url, options));
-    recordCall(usage, USAGE_ROW.createMonitor, monitor);
-    watches[kind] = { url, monitorId: monitor.id, addedAt: now };
-    if (monitor.webhook?.secret) secrets[monitor.id] = monitor.webhook.secret;
+    if (url) watches[kind] = await create(kind, url, kind);
   }
-  return { watches, secrets };
+  for (const p of extraPages) {
+    const watch = await create(p.kind, p.url, p.label, p.page);
+    extra.push({ ...watch, kind: p.kind, label: p.label, ...(p.kind === "page" ? { page: p.page ?? "other" } : {}) });
+  }
+  return { watches, extra, secrets };
 }
 
 /** Deletes the monitors. Deleting also deletes context.dev's copy of their changes: sync first. */
 export async function stopWatches(api: MonitorsApi, competitor: CompetitorRecord): Promise<void> {
-  for (const watch of Object.values(competitor.watches)) {
-    if (watch) await api.delete(watch.monitorId);
-  }
+  for (const watch of allWatches(competitor)) await api.delete(watch.monitorId);
 }

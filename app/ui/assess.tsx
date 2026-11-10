@@ -113,7 +113,7 @@ function AssessPanel({ data, onClose }: { data: AssessData; onClose: () => void 
     >
       <section className="border-b border-rule px-5 py-4">
         <div className="flex gap-3">
-          <Tag kind={data.kind} />
+          <Tag kind={data.kind} label={data.label} page={data.page} />
           <div className="min-w-0">
             <h3 className="text-body font-semibold">{data.title}</h3>
             <p className="text-small text-muted">

@@ -12,14 +12,15 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { TAG } from "./colors";
 import { FloatingCard } from "./hover-card";
 import { CompanyMark } from "./mark";
-import { Tag, TYPE_COLOR } from "./tag";
+import { familyOf, Tag, tagText, TYPE_COLOR } from "./tag";
+import type { PageType } from "@/lib/page-types";
 import { dayOfMonth, longDay, MONTHS, monthOf, rangeText, WEEKDAYS, weekday, yearOf } from "./time";
 import type { TimeView } from "./use-time-view";
 
 type Kind = keyof typeof TAG;
 
 /** n: the day number (see time.ts). */
-export type TimelineEvent = { id: string; slug: string; kind: Kind; title: string; n: number; detail: string };
+export type TimelineEvent = { id: string; slug: string; kind: Kind; title: string; n: number; detail: string; label?: string; page?: PageType };
 export type TimelineRow = {
   slug: string;
   name: string;
@@ -31,7 +32,7 @@ export type TimelineRow = {
   below: ReactNode;
 };
 
-const ORDER: Kind[] = ["pricing", "changelog", "news"];
+const ORDER: Kind[] = ["pricing", "changelog", "page", "news"];
 const GRID = "grid grid-cols-[44px_1fr] sm:grid-cols-[minmax(112px,180px)_1fr]";
 /** Below this many pixels per day, nearby days share one marker. */
 const MIN_GAP = 12;
@@ -182,7 +183,9 @@ export function Timeline({ tv, today, rows, events }: { tv: TimeView; today: num
         <div />
         <div className="relative">
           <div ref={axis} data-track className="relative h-11 cursor-grab touch-pan-y overflow-hidden">
-            {today >= first && today <= last && <span className="absolute bottom-0 h-0.5 bg-ink" style={{ left: x(today), width: `${100 / span}%` }} />}
+            {today >= first && today <= last && (
+              <span className="absolute bottom-0 h-0.5 bg-ink" style={{ left: x(today), width: `${100 / span}%` }} />
+            )}
             <Axis start={start} span={span} perDay={perDay} scale={scale} today={today} />
           </div>
           {/* Once today is off screen, a pill at the right end of the axis brings it back. It floats, so nothing around it moves. */}
@@ -253,7 +256,7 @@ export function Timeline({ tv, today, rows, events }: { tv: TimeView; today: num
                         <button
                           key={key}
                           type="button"
-                          aria-label={`${when}: ${list.map((e) => `${TAG[e.kind]}, ${e.title}`).join("; ")}`}
+                          aria-label={`${when}: ${list.map((e) => `${tagText(e)}, ${e.title}`).join("; ")}`}
                           className="absolute inset-y-0 z-10 flex -translate-x-1/2 cursor-pointer flex-col items-center justify-center gap-[3px] outline-none"
                           style={{ left: x(center), minWidth: words ? undefined : 16 }}
                           onPointerDown={(e) => (touch.current = e.pointerType === "touch")}
@@ -388,7 +391,7 @@ function Markers({ list, words, active }: { list: TimelineEvent[]; words: boolea
       <>
         {shown.map((e) => (
           <span key={e.id} className={`rounded-[5px] transition-shadow ${active ? "ring-2 ring-ink/15" : ""}`}>
-            <Tag kind={e.kind} />
+            <Tag kind={e.kind} label={e.label} page={e.page} />
           </span>
         ))}
         {more}
@@ -402,8 +405,8 @@ function Markers({ list, words, active }: { list: TimelineEvent[]; words: boolea
           key={e.id}
           className="size-2.5 rounded-full transition-transform"
           style={{
-            background: TYPE_COLOR[e.kind].fg,
-            boxShadow: active ? `0 0 0 2px #fff, 0 0 0 3.5px ${TYPE_COLOR[e.kind].fg}` : "0 0 0 2px #fff",
+            background: TYPE_COLOR[familyOf(e)].fg,
+            boxShadow: active ? `0 0 0 2px #fff, 0 0 0 3.5px ${TYPE_COLOR[familyOf(e)].fg}` : "0 0 0 2px #fff",
             transform: active ? "scale(1.15)" : undefined,
           }}
         />
@@ -538,7 +541,7 @@ function Popover({ open, today }: { open: Open; today: number }) {
         {list.slice(0, 5).map((e) => (
           <li key={e.id} className="flex items-start gap-2.5">
             <span className="pt-px">
-              <Tag kind={e.kind} />
+              <Tag kind={e.kind} label={e.label} page={e.page} />
             </span>
             <span className="min-w-0">
               {several && <span className="figures text-label block text-muted">{longDay(e.n)}</span>}

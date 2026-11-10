@@ -3,12 +3,16 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import type { Article } from "@/lib/news";
+import type { MorePage } from "@/lib/find-pages";
 import type { Company, Preview } from "@/lib/preview";
-import { dateTime, shortDate, shortUrl } from "./format";
+import { shortDate, shortUrl } from "./format";
 import { Kbd } from "./kbd";
 import { CompanyMark } from "./mark";
-import { CONTEXT_SIGNUP_URL, DEPLOY_URL, SELF_HOST_URL } from "@/lib/links";
-import { Modal } from "./modal";
+import { DemoModal } from "./demo-modal";
+import { MonitorRow, ROW_BUTTON } from "./monitor-row";
+import { MoreMonitorsModal } from "./more-monitors";
+import { PAGE_INSTRUCTIONS } from "@/lib/page-types";
+import { Tag } from "./tag";
 import { Sheet, useSheet } from "./sheet";
 import { useDemo } from "./shell";
 
@@ -35,13 +39,11 @@ function problemOf(body: { status?: string; cap?: number; nextRefillAt?: string 
     case "cap_reached":
       return {
         text: "Today's company lookups are used up. They start again at 00:00 UTC.",
-        detail: demoMode ? "Or run your own copy to look up any company." : "Raise PREVIEW_DAILY_CREDIT_CAP in .env to allow more.",
+        detail: demoMode ? "Or run your own copy to look up any company." : undefined,
       };
     case "out_of_credits":
-      return {
-        text: "Your context.dev account is out of credits.",
-        detail: body.nextRefillAt ? `Credits refill on ${dateTime(body.nextRefillAt)}.` : undefined,
-      };
+      // The developer's account, not the user's problem: neutral words here, the cause in the server log.
+      return { text: "Company lookup failed. Contact support." };
     case "setup_needed":
       return { text: body.message ?? "The app is not set up yet." };
     default:
@@ -69,11 +71,14 @@ export function AddPanel({ onClose, onAdded }: { onClose: () => void; onAdded: (
   const [focus, setFocus] = useState("");
   const [preview, setPreview] = useState<Preview | null>(null);
   const [instructions, setInstructions] = useState<Record<Kind, string> | null>(null);
+  const [newsDays, setNewsDays] = useState(1);
   const [monitors, setMonitors] = useState<{ used: number; limit: number } | null>(null);
   const [alreadyWatching, setAlreadyWatching] = useState(false);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [previewProblem, setPreviewProblem] = useState<Problem | null>(null);
   const [pages, setPages] = useState<Record<Kind, PageChoice> | null>(null);
+  const [more, setMore] = useState<MorePage[]>([]);
+  const [showMore, setShowMore] = useState(false);
   const [starting, setStarting] = useState(false);
   const [startProblem, setStartProblem] = useState<Problem | null>(null);
   const searchSeq = useRef(0);
@@ -109,6 +114,7 @@ export function AddPanel({ onClose, onAdded }: { onClose: () => void; onAdded: (
   async function choose(next: Company) {
     setCompany(next);
     setPreview(null);
+    setMore([]);
     setPreviewProblem(null);
     setStartProblem(null);
     setLoadingPreview(true);
@@ -116,6 +122,7 @@ export function AddPanel({ onClose, onAdded }: { onClose: () => void; onAdded: (
       preview: Preview;
       spent: { credits: number };
       instructions: Record<Kind, string>;
+      newsEveryDays: number;
       monitors: { used: number; limit: number } | null;
       watching: boolean;
     }>("/api/preview", { domain: next.domain, query });
@@ -126,6 +133,7 @@ export function AddPanel({ onClose, onAdded }: { onClose: () => void; onAdded: (
     }
     setPreview(body.preview);
     setInstructions(body.instructions);
+    setNewsDays(body.newsEveryDays ?? 1);
     setMonitors(body.monitors);
     setAlreadyWatching(body.watching);
     setCompany(body.preview.company);
@@ -148,6 +156,7 @@ export function AddPanel({ onClose, onAdded }: { onClose: () => void; onAdded: (
   function reset() {
     setCompany(null);
     setPreview(null);
+    setMore([]);
     setPages(null);
     setPreviewProblem(null);
     setStartProblem(null);
@@ -176,10 +185,11 @@ export function AddPanel({ onClose, onAdded }: { onClose: () => void; onAdded: (
     }
     setStarting(true);
     setStartProblem(null);
-    const body = await post<{ used?: number; limit?: number; kind?: Kind; competitor?: { slug: string } }>("/api/competitors", {
+    const body = await post<{ used?: number; limit?: number; kind?: Kind; label?: string; competitor?: { slug: string } }>("/api/competitors", {
       domain: company.domain,
       focus,
       pages: { changelog: pages.changelog.url, pricing: pages.pricing.url },
+      more,
     });
     setStarting(false);
     if (body.status === "added" || body.status === "already_watching") {
@@ -192,15 +202,18 @@ export function AddPanel({ onClose, onAdded }: { onClose: () => void; onAdded: (
     }
     if (body.status === "no_monitor_slots") {
       setStartProblem({
-        text: `Your context.dev plan allows ${body.limit} monitors and ${body.used} are in use. Watch fewer pages, or remove a competitor.`,
+        text: "This copy is watching as many pages as it can. Watch fewer pages, or remove a competitor.",
       });
+    } else if (body.status === "page_not_found" && body.label) {
+      setStartProblem({ text: `The ${body.label} page no longer opens. Remove it, or add it again with a new address.` });
     } else if (body.status === "page_not_found" && body.kind) {
       setStartProblem({ text: `The ${KIND_LABEL[body.kind].toLowerCase()} address no longer opens. Change it, or watch without it.` });
     } else setStartProblem(problemOf(body));
   }
 
   const watched = pages ? (["changelog", "pricing"] as const).filter((k) => pages[k].url) : [];
-  const fits = !monitors || monitors.used + watched.length <= monitors.limit;
+  const total = watched.length + more.length;
+  const fits = !monitors || monitors.used + total <= monitors.limit;
   const bare = query
     .trim()
     .toLowerCase()
@@ -230,7 +243,16 @@ export function AddPanel({ onClose, onAdded }: { onClose: () => void; onAdded: (
                   </p>
                 )}
                 {startProblem && <ProblemText problem={startProblem} />}
-                {showDemoCard && <DemoModal name={company?.name ?? "this competitor"} onClose={() => setShowDemoCard(false)} />}
+                {showDemoCard && (
+                  <DemoModal
+                    intro="This demo shows the steps. To start watching, run your own copy. It takes about 5 minutes."
+                    last={{
+                      title: `Add ${company?.name ?? "this competitor"} in your copy`,
+                      text: "Open Add competitor and go through the same steps you just tried.",
+                    }}
+                    onClose={() => setShowDemoCard(false)}
+                  />
+                )}
                 {
                   <button
                     type="button"
@@ -347,13 +369,17 @@ export function AddPanel({ onClose, onAdded }: { onClose: () => void; onAdded: (
               placeholder="Only report changes about sandboxes."
               className="ui-field text-body w-full resize-none rounded-[6px] px-3 py-2 placeholder:text-muted"
             />
-            <p className="text-small mt-1.5 text-muted">We use this when we check their pricing page and changelog, not their news.</p>
+            <p className="text-small mt-1.5 text-muted">We use this when we check their pages, not their news.</p>
           </Step>
 
           <Step
             n="03"
             title="What we will watch"
-            note={preview && pages ? `${watched.length} ${watched.length === 1 ? "monitor" : "monitors"} and daily news` : undefined}
+            note={
+              preview && pages
+                ? `${total} ${total === 1 ? "monitor" : "monitors"} and ${newsDays === 1 ? "daily news" : `news every ${newsDays} days`}`
+                : undefined
+            }
           >
             {loadingPreview && (
               <div aria-busy="true">
@@ -367,24 +393,65 @@ export function AddPanel({ onClose, onAdded }: { onClose: () => void; onAdded: (
             {previewProblem && <ProblemText problem={previewProblem} />}
             {preview && pages && (
               <div className="ui-fade-in">
-                {(["changelog", "pricing"] as const).map((kind) => (
-                  <PageRow
-                    key={kind}
-                    kind={kind}
-                    domain={company.domain}
-                    choice={pages[kind]}
-                    reports={instructions?.[kind] ?? ""}
-                    onChange={(patch) => updatePage(kind, patch)}
-                    onCheck={() => checkTyped(kind)}
-                  />
-                ))}
-                <div className="border-t border-rule pt-2.5">
-                  <div className="flex min-h-6 items-center justify-between gap-3">
-                    <div className="text-body font-semibold">News</div>
-                    <span className="text-small inline-flex h-6 items-center rounded-[5px] border border-rule/70 px-2 text-muted">Daily</span>
-                  </div>
-                  <NewsPreview preview={preview} />
+                <h4 className="text-small mb-2 font-semibold text-muted">Page monitors</h4>
+                <div>
+                  {(["changelog", "pricing"] as const).map((kind) => (
+                    <PageRow
+                      key={kind}
+                      kind={kind}
+                      domain={company.domain}
+                      choice={pages[kind]}
+                      reports={instructions?.[kind] ?? ""}
+                      onChange={(patch) => updatePage(kind, patch)}
+                      onCheck={() => checkTyped(kind)}
+                    />
+                  ))}
+                  {more.map((p) => (
+                    <MonitorRow
+                      key={p.url}
+                      tag={<Tag kind={p.kind} label={p.label} page={p.page} />}
+                      action={
+                        <button type="button" onClick={() => setMore((m) => m.filter((x) => x.url !== p.url))} className={ROW_BUTTON}>
+                          Remove
+                        </button>
+                      }
+                    >
+                      <div className="text-small flex min-h-6 items-center text-copy" title={p.url}>
+                        <span className="truncate">{shortUrl(p.url)}</span>
+                      </div>
+                      <p className="text-small mt-0.5 text-muted">
+                        {p.kind === "page" ? PAGE_INSTRUCTIONS[p.page ?? "other"] : (instructions?.[p.kind] ?? "")}
+                      </p>
+                    </MonitorRow>
+                  ))}
                 </div>
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowMore(true)}
+                    className="text-small h-7 rounded-[6px] bg-ink px-3 font-semibold text-white hover:bg-[#2f3a48]"
+                  >
+                    Add monitors
+                  </button>
+                </div>
+
+                <h4 className="text-small mt-3 mb-2 border-t border-rule pt-3 font-semibold text-muted">News search</h4>
+                <div>
+                  <MonitorRow tag={<Tag kind="news" />}>
+                    <div className="text-small flex min-h-6 items-center text-copy">
+                      Searched {newsDays === 1 ? "daily" : `every ${newsDays} days`} for new articles about {company.name}.
+                    </div>
+                    <NewsPreview preview={preview} />
+                  </MonitorRow>
+                </div>
+                {showMore && (
+                  <MoreMonitorsModal
+                    domain={company.domain}
+                    chosen={[pages.changelog.url, pages.pricing.url, ...more.map((p) => p.url)].filter((u): u is string => Boolean(u))}
+                    onAdd={(added) => setMore((m) => [...m, ...added])}
+                    onClose={() => setShowMore(false)}
+                  />
+                )}
               </div>
             )}
           </Step>
@@ -483,153 +550,94 @@ function PageRow({
   const bare = (url: string) => url.replace(/^https?:\/\//, "").replace(/\/$/, "");
   const action = "text-small rounded-[4px] text-copy underline-offset-2 hover:text-ink hover:underline";
   return (
-    <div className="border-t border-rule py-2.5 first:border-t-0 first:pt-0">
-      <div className="min-w-0">
-        <div className="flex min-h-5 items-center justify-between gap-3">
-          <div className="text-body font-semibold">{KIND_LABEL[kind]}</div>
-          {choice.url && !choice.editing && (
-            <button
-              type="button"
-              onClick={() => onChange({ editing: true, error: null, input: bare(choice.url!) })}
-              className="text-small h-6 rounded-[5px] border border-rule bg-white px-2 text-copy hover:border-edge hover:text-ink"
-            >
-              Change
-            </button>
+    <MonitorRow
+      tag={<Tag kind={kind} label={KIND_LABEL[kind]} />}
+      action={
+        choice.url &&
+        !choice.editing && (
+          <button type="button" onClick={() => onChange({ editing: true, error: null, input: bare(choice.url!) })} className={ROW_BUTTON}>
+            Change
+          </button>
+        )
+      }
+    >
+      {choice.editing ? (
+        <>
+          {!choice.url && !choice.found && (
+            <p className="text-small flex min-h-6 items-center text-copy">
+              We couldn&apos;t find a {word} on {domain}. Enter its address, or leave it empty to watch without it.
+            </p>
           )}
-        </div>
-
-        {choice.editing ? (
-          <>
-            {!choice.url && !choice.found && (
-              <p className="text-small mt-0.5 text-copy">
-                We couldn&apos;t find a {word} on {domain}. Enter its address, or leave it empty to watch without it.
-              </p>
-            )}
-            <label className="ui-field mt-2 flex h-(--control-h-sm) items-center gap-2 rounded-[6px] px-2.5">
-              <input
-                autoFocus={Boolean(choice.url)}
-                value={choice.input}
-                onChange={(e) => onChange({ input: e.target.value, error: null })}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") onCheck();
-                  if (e.key === "Escape" && choice.url) {
-                    e.stopPropagation();
-                    onChange({ editing: false, input: "", error: null });
-                  }
-                }}
-                enterKeyHint="go"
-                placeholder={`${domain}/${kind === "changelog" ? "changelog" : "pricing"}`}
-                className="text-small h-full min-w-0 flex-1 placeholder:text-muted"
-              />
-              {choice.checking ? <span className="ui-spinner text-muted" aria-label="Checking" /> : choice.input.trim() && <Kbd>Enter</Kbd>}
-            </label>
-            {choice.error && <p className="text-small mt-1.5 text-warn">{choice.error}</p>}
-            {(choice.url || choice.found) && (
-              <div className="mt-1.5 flex items-center gap-3">
-                {choice.url && (
-                  <button type="button" onClick={() => onChange({ editing: false, input: "", error: null })} className={action}>
-                    Cancel
-                  </button>
-                )}
-                <button type="button" onClick={() => onChange({ url: null, editing: false, input: "", error: null })} className={action}>
-                  Watch without it
+          <label className={`ui-field flex ${choice.url || choice.found ? "" : "mt-1.5"} h-(--control-h-sm) items-center gap-2 rounded-[6px] px-2.5`}>
+            <input
+              autoFocus={Boolean(choice.url)}
+              value={choice.input}
+              onChange={(e) => onChange({ input: e.target.value, error: null })}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") onCheck();
+                if (e.key === "Escape" && choice.url) {
+                  e.stopPropagation();
+                  onChange({ editing: false, input: "", error: null });
+                }
+              }}
+              enterKeyHint="go"
+              placeholder={`${domain}/${kind === "changelog" ? "changelog" : "pricing"}`}
+              className="text-small h-full min-w-0 flex-1 placeholder:text-muted"
+            />
+            {choice.checking ? <span className="ui-spinner text-muted" aria-label="Checking" /> : choice.input.trim() && <Kbd>Enter</Kbd>}
+          </label>
+          {choice.error && <p className="text-small mt-1.5 text-warn">{choice.error}</p>}
+          {(choice.url || choice.found) && (
+            <div className="mt-1.5 flex items-center gap-3">
+              {choice.url && (
+                <button type="button" onClick={() => onChange({ editing: false, input: "", error: null })} className={action}>
+                  Cancel
                 </button>
-              </div>
-            )}
-          </>
-        ) : choice.url ? (
-          <>
-            <div className="text-small truncate text-copy" title={choice.url}>
-              {shortUrl(choice.url)}
-            </div>
-            {choice.others.length > 0 && (
-              <div className="text-small text-muted">
-                <>
-                  {"Also found "}
-                  {choice.others.map((o) => (
-                    <button
-                      key={o}
-                      type="button"
-                      title={o}
-                      onClick={() => onChange({ url: o, others: [choice.url!, ...choice.others.filter((x) => x !== o)] })}
-                      className="text-accent hover:underline"
-                    >
-                      {shortUrl(o)}
-                    </button>
-                  ))}
-                </>
-              </div>
-            )}
-            {reports && <p className="text-small mt-1 text-muted">{reports}</p>}
-          </>
-        ) : (
-          <div className="mt-0.5 flex items-center gap-3">
-            <span className="text-small text-muted">Not watched.</span>
-            {choice.found && (
-              <button type="button" onClick={() => onChange({ url: choice.found, source: "found" })} className={action}>
-                Undo
+              )}
+              <button type="button" onClick={() => onChange({ url: null, editing: false, input: "", error: null })} className={action}>
+                Watch without it
               </button>
-            )}
-            <button type="button" onClick={() => onChange({ editing: true, input: "" })} className={action}>
-              Add an address
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** What Start watching opens on the public demo: how to watch your own competitors. */
-function DemoModal({ name, onClose }: { name: string; onClose: () => void }) {
-  const button = "text-body inline-flex h-8 items-center rounded-[6px] px-3";
-  const steps = [
-    {
-      title: "Get a context.dev API key",
-      text: "It runs the page checks and the news search for your copy.",
-      action: (
-        <a href={CONTEXT_SIGNUP_URL} target="_blank" rel="noreferrer" className={`${button} border border-rule bg-white text-ink hover:border-edge`}>
-          <span className="btn-label">Get a key</span>
-        </a>
-      ),
-    },
-    {
-      title: "Deploy your own copy",
-      text: DEPLOY_URL
-        ? "Vercel copies the app and asks for your key in one step. It also runs on any host with Node.js, or on your own server."
-        : "It runs on any host with Node.js, or on your own server. The README has the steps.",
-      action: SELF_HOST_URL ? (
-        <span className="flex flex-wrap gap-2">
-          {DEPLOY_URL && (
-            <a href={DEPLOY_URL} target="_blank" rel="noreferrer" className={`${button} bg-ink font-semibold text-white hover:bg-[#2f3a48]`}>
-              <span className="btn-label">Deploy to Vercel</span>
-            </a>
-          )}
-          <a href={SELF_HOST_URL} target="_blank" rel="noreferrer" className={`${button} border border-rule bg-white text-ink hover:border-edge`}>
-            <span className="btn-label">Other hosts</span>
-          </a>
-        </span>
-      ) : null,
-    },
-    { title: `Add ${name} in your copy`, text: "Open Add competitor and go through the same steps you just tried.", action: null },
-  ];
-  return (
-    <Modal title="Watch your own competitors" onClose={onClose}>
-      <p className="text-body text-copy">This demo shows the steps. To start watching, run your own copy. It takes about 5 minutes.</p>
-      <ol className="mt-4 space-y-4">
-        {steps.map((step, i) => (
-          <li key={step.title} className="flex gap-3">
-            <span className="figures text-small flex size-6 shrink-0 items-center justify-center rounded-full bg-panel-2 font-semibold text-ink">
-              {i + 1}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-body font-semibold">{step.title}</p>
-              <p className="text-small mt-0.5 text-muted">{step.text}</p>
-              {step.action && <div className="mt-2">{step.action}</div>}
             </div>
-          </li>
-        ))}
-      </ol>
-    </Modal>
+          )}
+        </>
+      ) : choice.url ? (
+        <>
+          <div className="text-small flex min-h-6 items-center text-copy" title={choice.url}>
+            <span className="truncate">{shortUrl(choice.url)}</span>
+          </div>
+          {choice.others.length > 0 && (
+            <div className="text-small text-muted">
+              <>
+                {"Also found "}
+                {choice.others.map((o) => (
+                  <button
+                    key={o}
+                    type="button"
+                    title={o}
+                    onClick={() => onChange({ url: o, others: [choice.url!, ...choice.others.filter((x) => x !== o)] })}
+                    className="text-accent hover:underline"
+                  >
+                    {shortUrl(o)}
+                  </button>
+                ))}
+              </>
+            </div>
+          )}
+          {reports && <p className="text-small mt-0.5 text-muted">{reports}</p>}
+        </>
+      ) : (
+        <div className="flex min-h-6 items-center gap-3">
+          <span className="text-small text-muted">Not watched.</span>
+          {choice.found && (
+            <button type="button" onClick={() => onChange({ url: choice.found, source: "found" })} className={action}>
+              Undo
+            </button>
+          )}
+          <button type="button" onClick={() => onChange({ editing: true, input: "" })} className={action}>
+            Add an address
+          </button>
+        </div>
+      )}
+    </MonitorRow>
   );
 }

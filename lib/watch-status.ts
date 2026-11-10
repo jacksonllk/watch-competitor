@@ -4,14 +4,14 @@
  */
 import type { MonitorListResponse, MonitorListRunsResponse } from "context.dev/resources";
 import { APP_TAG, type MonitorsApi } from "./context";
-import type { CompetitorRecord } from "./competitors";
+import { allWatches, type CompetitorRecord } from "./competitors";
 import type { NewsCheck } from "./news";
 
 export type Run = MonitorListRunsResponse.Data;
 export type MonitorInfo = Pick<MonitorListResponse.Data, "id" | "status">;
-export type WatchKind = "pricing" | "changelog" | "news";
+export type WatchKind = "pricing" | "changelog" | "news" | "page";
 
-export type Fix = "edit_address" | "try_another_page" | "wait_for_refill" | "resume" | "none";
+export type Fix = "edit_address" | "try_another_page" | "contact_support" | "resume" | "none";
 
 export type WatchState =
   /** compared: false while only the baseline has run, so no change could have been found yet. */
@@ -20,19 +20,25 @@ export type WatchState =
   | { kind: WatchKind; state: "not_working"; reason: string; since: string | null; fix: Fix }
   | { kind: WatchKind; state: "unknown"; reason: string };
 
+/** A watch's state with the name it shows: "Pricing", "Changelog", or an extra page's own, such as "Blog". */
+export type NamedState = WatchState & { label?: string };
+
 const RUNS_TO_READ = 5;
 
-/** Plain words for a run's error code, and the fix to offer. */
+/**
+ * Plain words for a run's error code, and the fix to offer. The people using the app see these, so they never name
+ * context.dev, credits or plans: those are the developer's to fix, and the server log tells the developer.
+ */
 function failureText(code: string): { reason: string; fix: Fix } {
   switch (code) {
     case "fetch_failed":
       return { reason: "the page was not found or has no readable text", fix: "edit_address" };
     case "access_policy_denied":
-      return { reason: "an access policy in your context.dev account blocks the page", fix: "none" };
+      return { reason: "this copy's settings block the page", fix: "none" };
     case "judge_failed":
-      return { reason: "context.dev could not judge the last changes", fix: "none" };
+      return { reason: "the last changes could not be read", fix: "none" };
     default:
-      return { reason: "the last checks failed in context.dev", fix: "none" };
+      return { reason: "the last checks failed", fix: "none" };
   }
 }
 
@@ -43,7 +49,14 @@ export function monitorState(kind: WatchKind, runs: Run[], status: MonitorInfo["
   const lastGood = relevant.find((r) => r.status === "completed");
 
   if (newest?.status === "skipped" && newest.skip_reason === "insufficient_credits") {
-    return { kind, state: "not_working", reason: "your context.dev account is out of credits", since: newest.started_at ?? null, fix: "wait_for_refill" };
+    return {
+      kind,
+      state: "not_working",
+      // context.dev skipped the run: the account is out of credits. The refresh logs that for the developer.
+      reason: "its checks failed",
+      since: newest.started_at ?? null,
+      fix: "contact_support",
+    };
   }
 
   // Failed runs in a row, newest first.
@@ -83,9 +96,9 @@ export function newsState(check: NewsCheck | null): WatchState {
     return { kind: "news", state: "not_working", reason: "no news source covers this company", since: check.at, fix: "none" };
   }
   if (check.reason === "out_of_credits") {
-    return { kind: "news", state: "not_working", reason: "your context.dev account is out of credits", since: check.at, fix: "wait_for_refill" };
+    return { kind: "news", state: "not_working", reason: "the news check failed", since: check.at, fix: "contact_support" };
   }
-  return { kind: "news", state: "not_working", reason: "the last news check failed", since: check.at, fix: "none" };
+  return { kind: "news", state: "not_working", reason: "the news check failed", since: check.at, fix: "none" };
 }
 
 export type MonitorSnapshot = {
@@ -103,8 +116,12 @@ export type MonitorSnapshot = {
   monitors: MonitorListResponse.Data[];
 };
 
-type Previous = { states: Record<string, WatchState>; lastRuns?: Record<string, string | null>; lastChanges?: Record<string, string | null>; statuses?: Record<string, string> };
-
+type Previous = {
+  states: Record<string, WatchState>;
+  lastRuns?: Record<string, string | null>;
+  lastChanges?: Record<string, string | null>;
+  statuses?: Record<string, string>;
+};
 
 /**
  * Reads every watched monitor's status with one list call (free). Reads a monitor's runs (free) only when its last run,
@@ -113,12 +130,7 @@ type Previous = { states: Record<string, WatchState>; lastRuns?: Record<string, 
 export async function readMonitors(api: MonitorsApi, competitors: CompetitorRecord[], previous: Previous | null): Promise<MonitorSnapshot> {
   const watched = competitors
     .filter((c) => c.status === "watching")
-    .flatMap((c) =>
-      (["pricing", "changelog"] as const).flatMap((kind) => {
-        const watch = c.watches[kind];
-        return watch ? [{ kind, monitorId: watch.monitorId }] : [];
-      }),
-    );
+    .flatMap((c) => allWatches(c).map((w) => ({ kind: w.kind, monitorId: w.monitorId })));
   const snapshot: MonitorSnapshot = {
     states: new Map(),
     nextRuns: {},
@@ -137,9 +149,7 @@ export async function readMonitors(api: MonitorsApi, competitors: CompetitorReco
     const m = byId.get(w.monitorId);
     if (!m) return false;
     return (
-      !previous?.states[w.monitorId] ||
-      previous.lastRuns?.[w.monitorId] !== (m.last_run_at ?? null) ||
-      previous.statuses?.[w.monitorId] !== m.status
+      !previous?.states[w.monitorId] || previous.lastRuns?.[w.monitorId] !== (m.last_run_at ?? null) || previous.statuses?.[w.monitorId] !== m.status
     );
   });
   const runs = await Promise.all(toRead.map((w) => api.listRuns(w.monitorId, { limit: RUNS_TO_READ })));
@@ -148,7 +158,13 @@ export async function readMonitors(api: MonitorsApi, competitors: CompetitorReco
   for (const w of watched) {
     const m = byId.get(w.monitorId);
     if (!m) {
-      snapshot.states.set(w.monitorId, { kind: w.kind, state: "not_working", reason: "the monitor no longer exists in context.dev", since: null, fix: "none" });
+      snapshot.states.set(w.monitorId, {
+        kind: w.kind,
+        state: "not_working",
+        reason: "the monitor no longer exists in context.dev",
+        since: null,
+        fix: "none",
+      });
       continue;
     }
     snapshot.monitors.push(m);

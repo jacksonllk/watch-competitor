@@ -10,5 +10,5 @@ export const ENTITY = [
 export const entity = (index: number) => ENTITY[index % ENTITY.length];
 
 /** The event type a watch reports, as its tag says it. The watch itself keeps its page name (KIND_NAME). */
-export const TAG = { changelog: "Feature", pricing: "Pricing", news: "News" } as const;
-export const KIND_NAME = { changelog: "Changelog", pricing: "Pricing", news: "News" } as const;
+export { KIND_TAG as TAG } from "@/lib/events";
+export const KIND_NAME = { changelog: "Changelog", pricing: "Pricing", news: "News", page: "Page" } as const;

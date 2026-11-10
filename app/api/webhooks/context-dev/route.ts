@@ -1,4 +1,5 @@
 import { after } from "next/server";
+import { afterRefresh } from "@/lib/background";
 import { refresh } from "@/lib/refresh";
 import { setup } from "@/lib/server";
 import { firstTime, loadSecrets, verifySignature } from "@/lib/webhook";
@@ -22,6 +23,7 @@ export async function POST(request: Request) {
 
   after(async () => {
     await refresh(ready.store, ready.api.monitors, { force: true });
+    await afterRefresh(ready.store, ready.api);
   });
   return new Response(null, { status: 200 });
 }

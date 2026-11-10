@@ -126,7 +126,8 @@ export function CompetitorActions({ slug, name, pages, removed }: { slug: string
             go: "Check now",
             run: async () => {
               const body = await call(`${base}/check`, "POST");
-              if (body.status === "out_of_credits") return "Your context.dev account is out of credits.";
+              // The developer's account ran out (the server log says so). Never name the vendor or credits here.
+              if (body.status === "out_of_credits") return "The check failed. Contact support.";
               if (body.status !== "started") return "Could not start the check. Try again in a minute.";
               notify(`Checking ${plural(body.pages ?? pages, "page")}. Results show here within a few minutes.`);
               return null;

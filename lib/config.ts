@@ -12,18 +12,21 @@ export type ScheduleUnit = "minutes" | "hours" | "days";
 export type Schedule = { every: number; unit: ScheduleUnit };
 export type Config = {
   schedule: Schedule;
-  alerts: { pricing: AlertLevel; changelog: AlertLevel; news: "off" | "all"; muted: string[] };
+  /** How often the app searches each competitor's news: every 1 to 7 days. Each search costs about 1 credit. */
+  news: { everyDays: number };
+  /** pages: changes on extra pages (careers, customers…), which have no importance rating, so off or all. */
+  alerts: { pricing: AlertLevel; changelog: AlertLevel; news: "off" | "all"; pages: "off" | "all"; muted: string[] };
   /** The base sentence sent to context.dev for each page monitor. The user's focus is added after it. */
   instructions: Record<PageKind, string>;
 };
 
 export const DEFAULT_CONFIG: Config = {
   schedule: { every: 1, unit: "days" },
-  alerts: { pricing: "all", changelog: "high", news: "all", muted: [] },
+  news: { everyDays: 1 },
+  alerts: { pricing: "all", changelog: "high", news: "all", pages: "all", muted: [] },
   instructions: {
     changelog: "Report new features and product launches. Ignore bug fixes, patch notes and dependency bumps.",
-    pricing:
-      "Report any change to plan names, prices, limits or what each plan includes. Ignore wording, layout and testimonial changes.",
+    pricing: "Report any change to plan names, prices, limits or what each plan includes. Ignore wording, layout and testimonial changes.",
   },
 };
 
@@ -36,6 +39,7 @@ export function mergeConfig(raw: unknown): Config {
   const instructions = input.instructions ?? {};
   return {
     schedule: readSchedule(input.schedule),
+    news: { everyDays: readNewsDays((input.news as { everyDays?: unknown } | undefined)?.everyDays) },
     alerts: { ...DEFAULT_CONFIG.alerts, ...(input.alerts as Partial<Config["alerts"]> | undefined) },
     instructions: {
       changelog: text(instructions.changelog, DEFAULT_CONFIG.instructions.changelog),
@@ -57,6 +61,12 @@ export function readSchedule(raw: unknown): Schedule {
   const every = Number(value.every);
   if (value.unit !== "days" || !Number.isInteger(every) || every < SCHEDULE_DAYS.min || every > SCHEDULE_DAYS.max) return DEFAULT_CONFIG.schedule;
   return { every, unit: "days" };
+}
+
+/** News every 1 to 7 days, the same limit as page checks. Anything else falls back to daily. */
+export function readNewsDays(raw: unknown): number {
+  const days = Number(raw);
+  return Number.isInteger(days) && days >= SCHEDULE_DAYS.min && days <= SCHEDULE_DAYS.max ? days : 1;
 }
 
 /** Checks a day per page, for cost lines. */

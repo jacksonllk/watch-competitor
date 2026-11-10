@@ -4,12 +4,12 @@
  * Credits are counted from what the API reports on each response.
  */
 import { APP_TAG, recordCall, USAGE_ROW, type ContextApi, type Usage } from "./context";
-import { loadCompetitors, saveCompetitor, slugFor, type CompetitorRecord } from "./competitors";
+import { allWatches, loadCompetitors, saveCompetitor, slugFor, type CompetitorRecord } from "./competitors";
 import { findPages, type FetchHop, type PageKind } from "./find-pages";
 import { checkNews, newsCheckKey, newsKey, relevantArticles, type NewsCheck } from "./news";
 import { normalizeDomain, previewKey, type Preview } from "./preview";
 import type { Store } from "./store/types";
-import { startWatches, type MonitorOptions } from "./watches";
+import { startWatches, type ExtraPage, type MonitorOptions } from "./watches";
 import { loadSecrets, saveSecrets } from "./webhook";
 
 export type AddInput = {
@@ -19,6 +19,8 @@ export type AddInput = {
   news?: boolean;
   /** Pages the user confirmed. A missing kind means "scan the site". null means "watch without it". */
   pages?: Partial<Record<PageKind, string | null>>;
+  /** Extra pages from Add more monitors, each its own monitor. Addresses already checked. */
+  more?: ExtraPage[];
 };
 
 export type AddResult =
@@ -52,7 +54,8 @@ export async function addCompetitor(
   // The same news rule as the preview, also for previews saved before the rule.
   const preview = saved?.news.ok ? { ...saved, ...newsVerdict(saved) } : saved;
   const pages = await chosenPages(domain, input.pages, preview, options.fetchHop);
-  const needed = Object.values(pages).filter(Boolean).length;
+  const more = input.more ?? [];
+  const needed = Object.values(pages).filter(Boolean).length + more.length;
 
   // Free: monitor management costs 0 credits. Paused monitors count too.
   const usage: Usage = {};
@@ -91,9 +94,11 @@ export async function addCompetitor(
     record.addedAt,
     usage,
     { instructions: options.instructions, schedule: options.schedule, webhookUrl: options.webhookUrl },
+    more,
   );
   if (Object.keys(started.secrets).length) await saveSecrets(store, { ...(await loadSecrets(store)), ...started.secrets });
   record.watches = started.watches;
+  if (started.extra.length) record.extra = started.extra;
   // Save right after the monitors exist, so a later failure never leaves monitors the app does not know about.
   await saveCompetitor(store, record);
 
@@ -107,7 +112,7 @@ export async function addCompetitor(
   } else {
     await checkNews(store, api.news, record, now, usage);
   }
-  return { status: "added", competitor: record, usage, firstChecks: Object.keys(record.watches).length };
+  return { status: "added", competitor: record, usage, firstChecks: allWatches(record).length };
 }
 
 /** The confirmed pages, else the preview's scan, else a fresh scan (free: plain requests to their site). */

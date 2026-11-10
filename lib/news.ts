@@ -52,29 +52,75 @@ export function relevantArticles(articles: Article[], name: string, domain: stri
  * 5 Nov, and two copies of one Daytona headline, each with its own story_id).
  */
 export const storyKey = (a: Article) =>
-  `${(a.published_at ?? "").slice(0, 10)} ${a.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 40)}`;
+  `${(a.published_at ?? "").slice(0, 10)} ${a.title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .slice(0, 40)}`;
 
-/** One article per story, keeping the first (newest first in, newest first out). */
-export function oneStoryEach(articles: Article[]): Article[] {
-  const seen = new Set<string>();
-  return articles.filter((a) => {
-    const keys = [a.story_id, storyKey(a)];
-    if (keys.some((k) => seen.has(k))) return false;
-    keys.forEach((k) => seen.add(k));
-    return true;
-  });
+const STORY_DAYS = 3;
+const STOP = new Set(
+  "about after again against also from have into more over said says than that their them then there these they this with will would what when where which while your just".split(
+    " ",
+  ),
+);
+/** Money amounts in a headline, such as "$60m" and "$1b" from "$60M at a $1B valuation". */
+const amounts = (title: string) =>
+  new Set(
+    (title.toLowerCase().match(/\$\s?\d[\d.,]*\s?(?:k|m|b|bn|million|billion)?\b/g) ?? []).map((m) =>
+      m
+        .replace(/\s|,/g, "")
+        .replace("million", "m")
+        .replace(/billion|bn/, "b"),
+    ),
+  );
+/** Words that carry a headline's meaning: 4 letters or more, not common words, not the company's own name. */
+const keyWords = (title: string, skip: Set<string>) =>
+  new Set((title.toLowerCase().match(/[a-z][a-z0-9-]{3,}/g) ?? []).filter((w) => !STOP.has(w) && !skip.has(w)));
+
+/**
+ * One story, told by different outlets: published within 3 days of each other, and sharing a money amount and one
+ * other key word ("$1b" and "valuation"), or most of their key words. Daytona's $1B round came as three headlines
+ * over three days (21 to 23 Oct), none sharing its first 40 characters.
+ */
+export function sameStory(a: Article, b: Article, company = ""): boolean {
+  if (a.story_id && a.story_id === b.story_id) return true;
+  if (storyKey(a) === storyKey(b)) return true;
+  const days = Math.abs(Date.parse(a.published_at ?? "") - Date.parse(b.published_at ?? "")) / 86_400_000;
+  if (!(days <= STORY_DAYS)) return false;
+  const skip = new Set(company.toLowerCase().split(/\s+/));
+  const [ma, mb] = [amounts(a.title), amounts(b.title)];
+  const [wa, wb] = [keyWords(a.title, skip), keyWords(b.title, skip)];
+  const sharedWords = [...wa].filter((w) => wb.has(w)).length;
+  if ([...ma].some((m) => mb.has(m)) && sharedWords >= 1) return true;
+  return sharedWords / Math.max(1, Math.min(wa.size, wb.size)) >= 0.6 && sharedWords >= 3;
+}
+
+/**
+ * One article per story, keeping the first (newest first in, newest first out). An article joins a story when it
+ * matches any article already in it, merged ones too, so a story told over several days stays one.
+ */
+export function oneStoryEach(articles: Article[], company = ""): Article[] {
+  const kept: Article[] = [];
+  const seen: Article[] = [];
+  for (const a of articles) {
+    if (!seen.some((s) => sameStory(s, a, company))) kept.push(a);
+    seen.push(a);
+  }
+  return kept;
 }
 
 /** Articles mainly about the company, newest first, one per story, no repeats. */
-export function keepArticles(existing: Article[], incoming: Article[]): Article[] {
+export function keepArticles(existing: Article[], incoming: Article[], company = ""): Article[] {
   const ids = new Set(existing.map((a) => a.id));
-  const stories = new Set(existing.flatMap((a) => [a.story_id, storyKey(a)]));
   const kept = [...existing];
+  const seen = [...existing];
   for (const article of incoming) {
-    if (article.match?.level !== "primary" || ids.has(article.id) || stories.has(article.story_id) || stories.has(storyKey(article))) continue;
+    if (article.match?.level !== "primary" || ids.has(article.id)) continue;
+    const repeat = seen.some((k) => sameStory(k, article, company));
+    seen.push(article);
+    if (repeat) continue;
     ids.add(article.id);
-    stories.add(article.story_id);
-    stories.add(storyKey(article));
     kept.push(article);
   }
   return kept.sort((a, b) => (b.published_at ?? "").localeCompare(a.published_at ?? ""));
@@ -114,8 +160,8 @@ export async function searchNews(api: NewsApi, domain: string, from: number, usa
 }
 
 /**
- * Checks one competitor's news, at most once a day. Visitors opening the app never trigger it:
- * only the scheduled job calls this. from: the last good check, or 90 days before it was added.
+ * Checks one competitor's news, at most once every `everyDays` days (settings file, default 1), whoever calls it: lib/background.ts runs it after each refresh.
+ * from: the last good check, or 90 days before it was added.
  */
 export async function checkNews(
   store: Store,
@@ -123,9 +169,10 @@ export async function checkNews(
   competitor: CompetitorRecord,
   now: Date,
   usage: Usage = {},
+  everyDays = 1,
 ): Promise<{ checked: boolean; saved: number; credits: number }> {
   const last = await store.get<NewsCheck>(newsCheckKey(competitor.slug));
-  if (last && now.getTime() - Date.parse(last.at) < DAY_MS - 60_000) return { checked: false, saved: 0, credits: 0 };
+  if (last && now.getTime() - Date.parse(last.at) < everyDays * DAY_MS - 60_000) return { checked: false, saved: 0, credits: 0 };
 
   const from = last?.ok ? Date.parse(last.at) : Date.parse(competitor.addedAt) - 90 * DAY_MS;
   const result = await searchNews(api, competitor.domain, from, usage);
@@ -143,7 +190,7 @@ export async function checkNews(
   const found = relevantArticles(searched, competitor.name, competitor.domain).articles;
 
   const existing = (await store.get<Article[]>(newsKey(competitor.slug))) ?? [];
-  const kept = keepArticles(existing, found);
+  const kept = keepArticles(existing, found, competitor.name);
   await store.set(newsKey(competitor.slug), kept);
   await store.set<NewsCheck>(newsCheckKey(competitor.slug), { at: now.toISOString(), ok: true, reason: null, nextRefillAt: null });
   return { checked: true, saved: kept.length - existing.length, credits };

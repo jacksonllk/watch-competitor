@@ -101,7 +101,7 @@ export async function searchCompanies(
 
   const cached = await store.get<Company[]>(searchKey(by, query));
   if (cached) return { status: "ok", companies: cached, spent: { credits: 0, usage }, cached: true };
-  if ((await spentToday(store, now)) >= cap) return { status: "cap_reached", cap };
+  if ((await spentToday(store, now)) >= cap) return capReached(cap);
 
   const found = await brandSearch(api.brand, by, query, usage);
   if (!("ok" in found)) return found;
@@ -127,7 +127,7 @@ export async function previewCompany(
   const usage: Usage = {};
   const cached = await store.get<Preview>(previewKey(domain));
   if (cached) return { status: "ok", preview: checkedNews(cached), spent: { credits: 0, usage }, cached: true };
-  if ((await spentToday(store, now)) >= cap) return { status: "cap_reached", cap };
+  if ((await spentToday(store, now)) >= cap) return capReached(cap);
 
   let credits = 0;
   let company = await companyFromSearchCache(store, domain, options.query);
@@ -144,7 +144,7 @@ export async function previewCompany(
   if (!news.ok && news.reason === "out_of_credits") return { status: "out_of_credits", nextRefillAt: news.nextRefillAt };
 
   const pages = await findPages(domain, options.fetchHop);
-  const relevant = news.ok ? relevantArticles(keepArticles([], news.articles), company.name, domain) : null;
+  const relevant = news.ok ? relevantArticles(keepArticles([], news.articles, company.name), company.name, domain) : null;
   const preview: Preview = {
     company,
     articles: relevant?.articles ?? [],
@@ -173,4 +173,10 @@ function checkedNews(preview: Preview): Preview {
   if (!preview.news.ok) return preview;
   const relevant = relevantArticles(preview.articles, preview.company.name, preview.company.domain);
   return { ...preview, articles: relevant.articles };
+}
+
+/** People see "Today's company lookups are used up". The developer reads how to allow more here. */
+function capReached(cap: number): Failure {
+  console.warn(`Company lookups stopped for today: PREVIEW_DAILY_CREDIT_CAP (${cap}) is reached. Raise it in .env to allow more.`);
+  return { status: "cap_reached", cap };
 }

@@ -1,5 +1,5 @@
 import type { CompetitorEvent } from "@/lib/events";
-import { buildFrame, nameTask, type Frame, type Task, type Tasks, type Templates } from "@/lib/prompt";
+import { buildFrame, tasksFor, type Frame, type Task, type Tasks, type Templates } from "@/lib/prompt";
 import { whatChanged, type ChangeRow } from "@/lib/what-changed";
 import { shortDate } from "./format";
 
@@ -7,6 +7,8 @@ import { shortDate } from "./format";
 export type AssessData = {
   id: string;
   kind: CompetitorEvent["kind"];
+  label?: string;
+  page?: CompetitorEvent["page"];
   title: string;
   competitor: string;
   detected: string;
@@ -25,6 +27,8 @@ export function assessData(event: CompetitorEvent, colorIndex: number, templates
   return {
     id: event.id,
     kind: event.kind,
+    ...(event.label ? { label: event.label } : {}),
+    ...(event.page ? { page: event.page } : {}),
     title: event.title,
     competitor: event.competitor.name,
     detected: shortDate(event.detectedAt),
@@ -32,7 +36,7 @@ export function assessData(event: CompetitorEvent, colorIndex: number, templates
     summary,
     rows,
     frame: buildFrame(event, templates),
-    tasks: tasks[event.kind].map((t) => nameTask(t, event.competitor.name)),
+    tasks: tasksFor(event, tasks),
     colorIndex,
   };
 }
