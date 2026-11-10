@@ -117,6 +117,23 @@ describe("checkNews", () => {
     expect(searched).toHaveLength(1);
   });
 
+  it("searches once when a second trigger arrives while the first search runs", async () => {
+    const store = createMemoryStore();
+    const { api, searched } = fakeContext({ articles: [] });
+    const slow = api.news.search;
+    let release = () => {};
+    api.news.search = async (body) => {
+      await new Promise<void>((r) => (release = r));
+      return slow(body);
+    };
+    const first = checkNews(store, api.news, acme, now);
+    await new Promise((r) => setTimeout(r, 5)); // the first has claimed and is waiting on context.dev
+    expect(await checkNews(store, api.news, acme, new Date(now.getTime() + 1000))).toEqual({ checked: false, saved: 0, credits: 0 });
+    release();
+    expect((await first).checked).toBe(true);
+    expect(searched).toHaveLength(1);
+  });
+
   it("says why it did not work: no news source (404)", async () => {
     const store = createMemoryStore();
     const { api } = fakeContext({ newsError: apiError(404, "NOT_FOUND") });

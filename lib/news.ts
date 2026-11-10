@@ -175,6 +175,11 @@ export async function checkNews(
   if (last && now.getTime() - Date.parse(last.at) < everyDays * DAY_MS - 60_000) return { checked: false, saved: 0, credits: 0 };
 
   const from = last?.ok ? Date.parse(last.at) : Date.parse(competitor.addedAt) - 90 * DAY_MS;
+  // Claim the search first: write its time before searching, so a second trigger moments later (often another
+  // server instance, from a webhook a second apart) sees "searched just now" and skips. The result overwrites this.
+  // Two triggers within the same few milliseconds can still both search: the store has no atomic claim.
+  const claim: NewsCheck = last ? { ...last, at: now.toISOString() } : { at: now.toISOString(), ok: true, reason: null, nextRefillAt: null };
+  await store.set<NewsCheck>(newsCheckKey(competitor.slug), claim);
   const result = await searchNews(api, competitor.domain, from, usage);
   if (!result.ok) {
     await store.set<NewsCheck>(newsCheckKey(competitor.slug), {
