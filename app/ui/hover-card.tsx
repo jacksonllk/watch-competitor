@@ -43,7 +43,12 @@ export function FloatingCard({ rect, children, interactive = false, width, compa
       className={`${interactive ? "" : "pointer-events-none"} fixed z-50 max-w-[min(320px,calc(100vw-16px))] rounded-[8px] border border-rule bg-white shadow-[0_8px_24px_rgba(16,24,40,0.12)] ${
         compact ? "text-small px-2.5 py-1.5 font-semibold whitespace-nowrap text-ink" : "p-3"
       }`}
-      style={pos ? { width, maxWidth: width, left: pos.left, top: pos.top } : { width, maxWidth: width, left: 0, top: 0, visibility: "hidden" }}
+      // Never wider than the screen less 8px a side: a 380px card on a 375px phone touched the edge (10 Nov).
+      style={{
+        width,
+        maxWidth: width ? `min(${width}px, calc(100vw - 16px))` : undefined,
+        ...(pos ? { left: pos.left, top: pos.top } : { left: 0, top: 0, visibility: "hidden" }),
+      }}
     >
       {children}
     </div>,

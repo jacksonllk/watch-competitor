@@ -181,7 +181,7 @@ export function MoreMonitorsModal({
           onKeyDown={(e) => e.key === "Enter" && check()}
           placeholder={`${domain}/security`}
           aria-label="Page address"
-          className="ui-field text-body h-(--control-h) min-w-0 flex-1 rounded-[6px] border border-rule bg-white px-3"
+          className="ui-field text-body h-(--control-h) min-w-0 shrink-0 rounded-[6px] border border-rule bg-white px-3 sm:flex-1"
         />
         <button
           type="button"

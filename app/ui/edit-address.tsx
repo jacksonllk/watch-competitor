@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Modal } from "./modal";
 import { useNotify } from "./shell";
+import { SupportText } from "./support-text";
 
 export function EditAddressButton({ slug, monitorId, label, url }: { slug: string; monitorId: string; label: string; url: string | null }) {
   const [open, setOpen] = useState(false);
@@ -106,7 +107,9 @@ function EditAddressModal({
         className="ui-field text-body mt-3 h-(--control-h) w-full rounded-[6px] border border-rule bg-white px-3"
       />
       {problem ? (
-        <p className="text-small mt-1.5 text-warn">{problem}</p>
+        <p className="text-small mt-1.5 text-warn">
+          <SupportText text={problem} />
+        </p>
       ) : (
         <p className="text-small mt-1.5 text-muted">Changes found before today stay on the timeline.</p>
       )}

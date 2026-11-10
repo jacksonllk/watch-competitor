@@ -15,6 +15,7 @@ import { dateTime, hostOf, relative, shortDate } from "./format";
 import { contextDevLink } from "@/lib/links";
 import { Footer } from "./context-dev";
 import { CompanyMark } from "./mark";
+import { SupportText } from "./support-text";
 import { OverviewBoard, type FeedItem } from "./overview-board";
 import { Refresher } from "./refresher";
 import { assessData } from "./assess-data";
@@ -243,7 +244,7 @@ const FIX_TEXT: Record<string, string> = {
   try_another_page: "Open the competitor to pick another page.",
   // The developer's account ran out (the server log says so): the user can only tell whoever runs the app.
   contact_support: "Contact support.",
-  resume: "Fix the cause, then resume the monitor.",
+  resume: "Whoever runs this copy can restart it.",
 };
 
 function StatusLine({ watches, className = "" }: { watches: NamedState[]; className?: string }) {
@@ -261,7 +262,7 @@ function StatusLine({ watches, className = "" }: { watches: NamedState[]; classN
                 since <span className="figures">{shortDate(w.since)}</span>
               </>
             ) : null}
-            : {w.reason}. {FIX_TEXT[w.fix] ?? ""}
+            : {w.reason}. <SupportText text={FIX_TEXT[w.fix] ?? ""} />
           </p>
         ) : null,
       )}

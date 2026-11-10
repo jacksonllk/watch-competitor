@@ -19,6 +19,7 @@ import { MonitorRow, ROW_BUTTON } from "./monitor-row";
 import { MoreMonitorsModal } from "./more-monitors";
 import { DemoModal } from "./demo-modal";
 import { useNotify } from "./shell";
+import { SupportText } from "./support-text";
 import { Tag } from "./tag";
 
 /** A page monitor as the list shows it. url is null for a pricing page or changelog that is not watched. */
@@ -150,7 +151,11 @@ function ManageMonitorsModal({ slug, name, domain, monitors, news, demo, onClose
         ))}
       </div>
       <div className="flex items-center justify-end gap-3 pt-1">
-        {problem && <p className="text-small mr-auto text-warn">{problem}</p>}
+        {problem && (
+          <p className="text-small mr-auto text-warn">
+            <SupportText text={problem} />
+          </p>
+        )}
         <button
           type="button"
           onClick={() => setPicking(true)}
@@ -339,7 +344,9 @@ function PageMonitor({
             {m.settingUp && mode === "view" && <span className="ml-2 shrink-0 text-muted">First check running</span>}
           </div>
           {problem ? (
-            <p className="text-small mt-0.5 text-warn">{problem}</p>
+            <p className="text-small mt-0.5 text-warn">
+              <SupportText text={problem} />
+            </p>
           ) : mode === "confirm" ? (
             <p className="text-small mt-0.5 text-warn">Stop watching this page? The changes it found stay on the timeline.</p>
           ) : (

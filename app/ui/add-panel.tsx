@@ -13,6 +13,7 @@ import { MonitorRow, ROW_BUTTON } from "./monitor-row";
 import { MoreMonitorsModal } from "./more-monitors";
 import { PAGE_INSTRUCTIONS } from "@/lib/page-types";
 import { Tag } from "./tag";
+import { SupportText } from "./support-text";
 import { Sheet, useSheet } from "./sheet";
 import { useDemo } from "./shell";
 
@@ -504,7 +505,9 @@ function Step({ n, title, note, children }: { n: string; title: string; note?: s
 function ProblemText({ problem }: { problem: Problem }) {
   return (
     <div className="ui-fade-in mt-2.5">
-      <p className="text-body text-warn">{problem.text}</p>
+      <p className="text-body text-warn">
+        <SupportText text={problem.text} />
+      </p>
       {problem.detail && <p className="text-small mt-1 text-muted">{problem.detail}</p>}
     </div>
   );

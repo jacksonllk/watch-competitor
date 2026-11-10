@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 
 /** A row that scrolls sideways instead of wrapping. Its edges fade where more is hidden. */
-export function ScrollRow({ label, children }: { label: string; children: React.ReactNode }) {
+/** bleed: on narrow screens the row runs to the screen edges (the Overview toolbar). Off when something sits beside the row. */
+export function ScrollRow({ label, children, bleed = true }: { label: string; children: React.ReactNode; bleed?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const [fade, setFade] = useState({ left: false, right: false });
   useEffect(() => {
@@ -25,7 +26,7 @@ export function ScrollRow({ label, children }: { label: string; children: React.
       ref={ref}
       role="group"
       aria-label={label}
-      className="ui-scroll-x -mx-(--gutter) flex min-w-0 items-center gap-1.5 overflow-x-auto px-(--gutter) lg:mx-0 lg:flex-1 lg:px-0"
+      className={`ui-scroll-x relative flex min-w-0 items-center gap-1.5 overflow-x-auto ${bleed ? "-mx-(--gutter) px-(--gutter) lg:mx-0 lg:flex-1 lg:px-0" : ""}`}
       style={{ maskImage: mask, WebkitMaskImage: mask }}
     >
       {children}

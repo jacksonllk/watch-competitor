@@ -1,11 +1,11 @@
 import { Suspense } from "react";
 import { Overview } from "./ui/overview";
-import { isDemo } from "@/lib/links";
+import { isDemo, supportUrl } from "@/lib/links";
 import { Shell } from "./ui/shell";
 
 export default function Page({ searchParams }: PageProps<"/">) {
   return (
-    <Shell demo={isDemo()}>
+    <Shell demo={isDemo()} supportUrl={supportUrl()}>
       <main className="mx-auto flex min-h-[calc(100dvh-3rem)] max-w-[1200px] flex-col md:border-x md:border-rule">
         <Suspense fallback={<OverviewSkeleton />}>
           <Overview searchParams={searchParams} />

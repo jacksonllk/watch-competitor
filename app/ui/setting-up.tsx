@@ -3,6 +3,8 @@
  * A competitor just added (no page compared yet) gets the full steps: company details, news and each page.
  * A monitor added later gets one line per page whose first check runs, so it says exactly what is running.
  */
+import { SupportText } from "./support-text";
+
 export type SetupStep = { state: "done" | "running" | "off" | "problem"; text: string };
 
 /**
@@ -56,7 +58,9 @@ export function SettingUp({ isNew, steps, pad = "" }: { isNew: boolean; steps: S
               className={`text-body flex items-center gap-2.5 ${s.state === "problem" ? "text-warn" : s.state === "off" ? "text-muted" : ""}`}
             >
               <StepIcon state={s.state} />
-              {s.text}
+              <span>
+                <SupportText text={s.text} />
+              </span>
             </li>
           ))}
         </ul>

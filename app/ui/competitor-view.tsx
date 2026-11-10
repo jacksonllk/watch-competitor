@@ -16,6 +16,7 @@ import { hostOf, relative, shortDate, shortUrl } from "./format";
 import { Refresher } from "./refresher";
 import { AssessButton } from "./assess";
 import { assessData } from "./assess-data";
+import { ScrollRow } from "./scroll-row";
 import { ShowMore } from "./show-more";
 import { CompanyMark } from "./mark";
 import { EditAddressButton } from "./edit-address";
@@ -24,6 +25,7 @@ import { SettingUp, setupSteps } from "./setting-up";
 import { ManageMonitorsButton, type ManagedMonitor } from "./manage-monitors";
 import { STATE_COLOR, Stat, Strip, Value } from "./strip";
 import { Tag } from "./tag";
+import { SupportText } from "./support-text";
 
 const PAD = "px-(--gutter)";
 const OPEN_LABEL: Record<EventKind, string> = { pricing: "Open pricing page", changelog: "Open changelog", news: "Open article", page: "Open page" };
@@ -151,16 +153,19 @@ function View({
         <div className="min-w-0">
           {page.settingUp && !removed && <SetupBox page={page} />}
 
-          <nav aria-label="Filter by type" className={`flex flex-wrap items-center gap-1.5 border-b border-rule ${PAD} py-3`}>
-            <Chip href={base} active={!page.filter}>
-              All <Count n={page.total} />
-            </Chip>
-            {/* One chip per tag: Features, Pricing, News, then each extra page by its own name, such as Careers. */}
-            {page.filters.map((f) => (
-              <Chip key={f.key} href={`${base}?k=${encodeURIComponent(f.key)}`} active={page.filter === f.key}>
-                {f.label} <Count n={f.count} />
+          {/* Phone: the chips scroll sideways in one row and the gear stays in view after them (kit rule: toolbars never wrap). */}
+          <nav aria-label="Filter by type" className={`flex items-center gap-1.5 border-b border-rule ${PAD} py-3`}>
+            <ScrollRow label="Filter by type" bleed={false}>
+              <Chip href={base} active={!page.filter}>
+                All <Count n={page.total} />
               </Chip>
-            ))}
+              {/* One chip per tag: Features, Pricing, News, then each extra page by its own name, such as Careers. */}
+              {page.filters.map((f) => (
+                <Chip key={f.key} href={`${base}?k=${encodeURIComponent(f.key)}`} active={page.filter === f.key}>
+                  {f.label} <Count n={f.count} />
+                </Chip>
+              ))}
+            </ScrollRow>
             {/* The gear opens Manage monitors. On the demo it shows the list, and adding shows how to run your own copy. */}
             {!removed && (
               <ManageMonitorsButton
@@ -399,7 +404,7 @@ function BrokenWatches({ watches, slug }: { watches: WatchRow[]; slug: string })
         w.state?.state === "not_working" ? (
           <p key={`${w.kind}-${w.label ?? ""}`}>
             <span className="font-semibold text-ink">{w.label} is not working</span>
-            {w.state.since ? ` since ${shortDate(w.state.since)}` : ""}: {w.state.reason}. {FIX[w.state.fix] ?? ""}
+            {w.state.since ? ` since ${shortDate(w.state.since)}` : ""}: {w.state.reason}. <SupportText text={FIX[w.state.fix] ?? ""} />
             {w.monitorId && (w.state.fix === "edit_address" || w.state.fix === "try_another_page") && (
               <EditAddressButton slug={slug} monitorId={w.monitorId} label={w.label} url={w.url} />
             )}

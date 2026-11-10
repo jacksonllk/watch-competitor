@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useNotify } from "./shell";
+import { SupportText } from "./support-text";
 
 type Action = { label: string; confirm: string; detail: string; go: string; danger?: boolean; run: () => Promise<string | null> };
 
@@ -61,7 +62,11 @@ function ConfirmButton({ action, primary = false }: { action: Action; primary?: 
         >
           <p className="text-body font-semibold">{action.confirm}</p>
           <p className="text-small mt-1 text-copy">{action.detail}</p>
-          {problem && <p className="text-small mt-2 text-warn">{problem}</p>}
+          {problem && (
+            <p className="text-small mt-2 text-warn">
+              <SupportText text={problem} />
+            </p>
+          )}
           <div className="mt-3 flex gap-2">
             <button
               type="button"

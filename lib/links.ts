@@ -1,6 +1,12 @@
-/** Public links shown in the app. Fill REPO_URL when the repo is public: the demo's "run your own copy" card links to it. */
-export const REPO_URL = "";
-export const SELF_HOST_URL = REPO_URL ? `${REPO_URL}#deploy-your-own` : "";
+/** The open source repo. The footer links to it on every page. Private until launch: until then GitHub shows "not found" to others. */
+export const REPO_URL = "https://github.com/jacksonllk/competitor-watch";
+/**
+ * Set true at launch, once the repo is public, the README has its deploy section, and the Deploy button was clicked end to
+ * end (Jackson's rule: a one-click deploy button only for a host we deployed and tested). Until then the demo's
+ * "run your own copy" card shows neither deploy link.
+ */
+export const LAUNCHED = false;
+export const SELF_HOST_URL = LAUNCHED ? `${REPO_URL}#deploy-your-own` : "";
 /** Where a context.dev link sits in the app, so its visits trace to this project. */
 export type LinkSpot = "footer" | "demo_card" | "setup";
 
@@ -14,7 +20,7 @@ export function contextDevLink(spot: LinkSpot): string {
  * and stores to add an Upstash Redis store from the Marketplace in the same flow (slugs from `vercel integration add
  * upstash/upstash-kv`). The env and stores parts are unverified until the button is clicked once the repo is public.
  */
-export const DEPLOY_URL = REPO_URL
+export const DEPLOY_URL = LAUNCHED
   ? "https://vercel.com/new/clone?" +
     new URLSearchParams({
       "repository-url": REPO_URL,
@@ -29,4 +35,16 @@ export const DEPLOY_URL = REPO_URL
 /** The public demo: visitors can try every step, but nothing is created, checked or removed on the demo's key. */
 export function isDemo(env: Record<string, string | undefined> = process.env): boolean {
   return env.DEMO_MODE === "true";
+}
+
+/**
+ * SUPPORT_URL (optional): where "Contact support" links in the app, such as https://acme.com/help or help@acme.com.
+ * A bare email becomes a mailto: link. Unset or not a link or an email: "Contact support" shows as plain words.
+ */
+export function supportUrl(env: Record<string, string | undefined> = process.env): string | null {
+  const value = env.SUPPORT_URL?.trim();
+  if (!value) return null;
+  if (/^(https?:\/\/|mailto:)\S+$/i.test(value)) return value;
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return `mailto:${value}`;
+  return null;
 }
