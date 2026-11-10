@@ -2,7 +2,7 @@ import { after } from "next/server";
 import { afterRefresh } from "@/lib/background";
 import { refresh } from "@/lib/refresh";
 import { setup } from "@/lib/server";
-import { firstTime, loadSecrets, verifySignature } from "@/lib/webhook";
+import { firstTime, loadSecrets, reloadSecrets, verifySignature } from "@/lib/webhook";
 
 /**
  * Receives context.dev's "run finished" events (only when the app has a public address, see lib/webhook.ts).
@@ -13,9 +13,11 @@ export async function POST(request: Request) {
   const ready = setup();
   if (!ready.ok) return new Response(null, { status: 503 });
   const raw = await request.text();
-  const secrets = Object.values(await loadSecrets(ready.store));
-  if (!verifySignature(raw, request.headers.get("x-context-signature"), secrets)) {
-    return new Response(null, { status: 401 });
+  const signature = request.headers.get("x-context-signature");
+  if (!verifySignature(raw, signature, Object.values(await loadSecrets(ready.store)))) {
+    // A rotated secret is not saved yet: read the current ones from context.dev (at most every 5 minutes), then check again.
+    const fresh = await reloadSecrets(ready.store, ready.api.monitors).catch(() => null);
+    if (!fresh || !verifySignature(raw, signature, fresh)) return new Response(null, { status: 401 });
   }
   const eventId = request.headers.get("x-context-id");
   // Retries and replays carry the same ID: handle each event once.

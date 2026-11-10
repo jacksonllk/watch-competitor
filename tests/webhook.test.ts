@@ -5,7 +5,7 @@ import { checksPerDay, readSchedule } from "@/lib/config";
 import { alignMonitors, isDue } from "@/lib/refresh";
 import { createMemoryStore } from "@/lib/store/memory";
 import { monitorParams } from "@/lib/watches";
-import { firstTime, loadSecrets, verifySignature, webhookUrl } from "@/lib/webhook";
+import { firstTime, loadSecrets, reloadSecrets, saveSecrets, verifySignature, webhookUrl } from "@/lib/webhook";
 import { fakeContext } from "./helpers/fake-context";
 
 const sign = (body: string, secret: string, t: number) => `t=${t},v1=${createHmac("sha256", secret).update(`${t}.`).update(body).digest("hex")}`;
@@ -37,6 +37,28 @@ describe("verifySignature", () => {
     const store = createMemoryStore();
     expect(await firstTime(store, "evt_1")).toBe(true);
     expect(await firstTime(store, "evt_1")).toBe(false);
+  });
+});
+
+describe("reloadSecrets", () => {
+  it("reads rotated secrets from context.dev once, then waits 5 minutes before reading again", async () => {
+    const store = createMemoryStore();
+    await saveSecrets(store, { mon_a: "whsec_old" });
+    const { api } = fakeContext({
+      monitors: [{ id: "mon_a", webhook: { url: "https://x.example/api/webhooks/context-dev", secret: "whsec_new" } }] as never,
+    });
+    let lists = 0;
+    const list = api.monitors.list;
+    api.monitors.list = async (q) => (lists++, list(q));
+    const body = '{"type":"run.completed"}';
+    const t = Math.floor(Date.now() / 1000);
+    expect(verifySignature(body, sign(body, "whsec_new", t), Object.values(await loadSecrets(store)))).toBe(false);
+    const fresh = await reloadSecrets(store, api.monitors);
+    expect(fresh).toEqual(["whsec_new"]);
+    expect(verifySignature(body, sign(body, "whsec_new", t), fresh!)).toBe(true);
+    expect(await loadSecrets(store)).toEqual({ mon_a: "whsec_new" });
+    expect(await reloadSecrets(store, api.monitors)).toBeNull();
+    expect(lists).toBe(1);
   });
 });
 

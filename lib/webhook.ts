@@ -5,6 +5,7 @@
  * schedule (lib/refresh.ts), which works everywhere.
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { APP_TAG, type MonitorsApi } from "./context";
 import type { Store } from "./store/types";
 
 export const WEBHOOK_PATH = "/api/webhooks/context-dev";
@@ -52,6 +53,25 @@ export async function loadSecrets(store: Store): Promise<Record<string, string>>
 
 export async function saveSecrets(store: Store, secrets: Record<string, string>): Promise<void> {
   await store.set(WEBHOOK_SECRETS, secrets);
+}
+
+const RELOADED = "webhook:secrets-reloaded";
+/** At most one reload per 5 minutes, so unsigned requests cannot make the app call context.dev over and over. */
+const RELOAD_EVERY_SECONDS = 300;
+
+/**
+ * After a signature that matches no saved secret: read every monitor's current secret from context.dev (one free list
+ * call) and save them. A secret rotated in context.dev (or in its dashboard) then works at once, without waiting for
+ * the next refresh. Returns the fresh secrets, or null when a reload ran in the last 5 minutes.
+ */
+export async function reloadSecrets(store: Store, api: MonitorsApi): Promise<string[] | null> {
+  if (await store.get(RELOADED)) return null;
+  await store.set(RELOADED, true, { ttlSeconds: RELOAD_EVERY_SECONDS });
+  const list = await api.list({ tag: APP_TAG, limit: 100 });
+  const fresh: Record<string, string> = {};
+  for (const m of list.data) if (m.webhook?.secret) fresh[m.id] = m.webhook.secret;
+  await saveSecrets(store, { ...(await loadSecrets(store)), ...fresh });
+  return Object.values(fresh);
 }
 
 /** True the first time an event ID is seen. Retries and replays of the same event return false. */
