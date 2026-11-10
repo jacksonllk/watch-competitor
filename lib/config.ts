@@ -1,5 +1,5 @@
 /**
- * Optional settings file `competitor-watch.config.json` in the repo root.
+ * Optional settings file `watch-competitor.config.json` in the repo root.
  * Missing file or missing keys fall back to the defaults below. The README's Configuration section documents it.
  */
 import { readFileSync } from "node:fs";
@@ -30,7 +30,7 @@ export const DEFAULT_CONFIG: Config = {
   },
 };
 
-export const CONFIG_FILE = "competitor-watch.config.json";
+export const CONFIG_FILE = "watch-competitor.config.json";
 
 /** Merges a parsed settings file over the defaults. Ignores keys and values it does not know. */
 export function mergeConfig(raw: unknown): Config {

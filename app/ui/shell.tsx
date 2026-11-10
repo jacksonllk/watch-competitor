@@ -35,7 +35,7 @@ export function Shell({ children, demo = false, supportUrl = null }: { children:
               <div className="mx-auto flex h-full max-w-[1200px] items-center gap-6 px-(--gutter)">
                 <Link href="/" className="text-heading flex items-center gap-2.5 font-semibold text-ink">
                   <Logo />
-                  Competitor Watch
+                  Watch Competitor
                 </Link>
                 <nav className="hidden h-full items-center sm:flex">
                   <Suspense fallback={<OverviewLink active={false} />}>
@@ -85,7 +85,7 @@ export function AddButton() {
   );
 }
 
-/** A magnifying glass over a target: watching competitors closely. public/logo.svg, drawn from public/competitor-watch-logo.png. */
+/** A magnifying glass over a target: watching competitors closely. public/logo.svg, drawn from public/watch-competitor-logo.png. */
 function Logo() {
   return <Image src="/logo.svg" alt="" width={24} height={24} priority />;
 }

@@ -1,5 +1,5 @@
 /** The open source repo. The footer links to it on every page. Private until launch: until then GitHub shows "not found" to others. */
-export const REPO_URL = "https://github.com/jacksonllk/competitor-watch";
+export const REPO_URL = "https://github.com/jacksonllk/watch-competitor";
 /**
  * Set true at launch, once the repo is public, the README has its deploy section, and the Deploy button was clicked end to
  * end (Jackson's rule: a one-click deploy button only for a host we deployed and tested). Until then the demo's
@@ -12,7 +12,7 @@ export type LinkSpot = "footer" | "demo_card" | "setup";
 
 /** A link to context.dev tagged with this project and the spot it sits in. No visitor data goes in it. */
 export function contextDevLink(spot: LinkSpot): string {
-  return `https://context.dev/?utm_source=competitor-watch&utm_medium=${spot}&utm_campaign=open-source`;
+  return `https://context.dev/?utm_source=watch-competitor&utm_medium=${spot}&utm_campaign=open-source`;
 }
 /**
  * One-click deploy, for the one host we deploy and test ourselves (Vercel). Always shown next to "Other hosts".
@@ -24,7 +24,7 @@ export const DEPLOY_URL = LAUNCHED
   ? "https://vercel.com/new/clone?" +
     new URLSearchParams({
       "repository-url": REPO_URL,
-      "project-name": "competitor-watch",
+      "project-name": "watch-competitor",
       env: "CONTEXT_DEV_API_KEY",
       envDescription: "Your context.dev API key. Restricted keys need Data APIs (use) and Monitors (manage).",
       envLink: "https://context.dev",

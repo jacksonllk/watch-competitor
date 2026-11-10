@@ -32,7 +32,7 @@ export function AssessButton({ data }: { data: AssessData }) {
 }
 
 /** The tasks last ticked for this event type, kept in this browser only. */
-const memoryKey = (kind: string) => `competitor-watch:assess:${kind}`;
+const memoryKey = (kind: string) => `watch-competitor:assess:${kind}`;
 function remembered(kind: string, ids: string[]): string[] {
   try {
     const saved = JSON.parse(localStorage.getItem(memoryKey(kind)) ?? "[]");

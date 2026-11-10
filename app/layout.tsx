@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"], weight: ["400", "600"] });
 
 export const metadata: Metadata = {
-  title: "Competitor Watch",
+  title: "Watch Competitor",
   description: "Watch your competitors' pricing, launches and news, and respond with your AI agent.",
 };
 

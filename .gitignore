@@ -51,3 +51,6 @@ next-env.d.ts
 
 # Saved context.dev responses with other sites' text. Local only, never in the public repo.
 /tests/fixtures/local/
+
+# Created by `vercel link` and `vercel env pull`. Never committed.
+.env*.local

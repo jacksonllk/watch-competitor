@@ -13,6 +13,7 @@ export interface Store {
 }
 
 /** Every key this app writes starts with this. The Upstash database is shared with another app. */
+// The app's original name (renamed Watch Competitor on 10 Nov 2026), kept so saved data keeps loading: every stored key starts with it.
 export const KEY_PREFIX = "competitor-watch:";
 
 export function prefixed(key: string): string {

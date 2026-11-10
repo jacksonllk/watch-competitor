@@ -22,6 +22,7 @@ import type {
 } from "context.dev/resources";
 
 /** Every request and every monitor carries this tag, so usage traces to this app. */
+// The app's original name (renamed Watch Competitor on 10 Nov 2026), kept so the 7 live monitors and their changes keep matching: the app finds them by this tag.
 export const APP_TAG = "competitor-watch";
 
 type Credits = { key_metadata?: { credits_consumed: number } };
@@ -91,7 +92,9 @@ export function failureOf(error: unknown): ApiFailure {
   const body = (error.error ?? {}) as { error_code?: string; error_data?: { next_refill_at?: string } };
   // People using the app see neutral words ("Try again later"). The developer reads the cause here.
   if (error.status === 402) {
-    console.warn(`context.dev: the account is out of credits${body.error_data?.next_refill_at ? `, refill at ${body.error_data.next_refill_at}` : ""}.`);
+    console.warn(
+      `context.dev: the account is out of credits${body.error_data?.next_refill_at ? `, refill at ${body.error_data.next_refill_at}` : ""}.`,
+    );
   }
   return {
     status: error.status ?? null,

@@ -44,6 +44,7 @@ export function monitorParams(
     target: { type: "page", url, instructions },
     change_detection: { type: "semantic" },
     schedule: { type: "interval", frequency: schedule.every, unit: schedule.unit },
+    // cw: is short for the app's original name, competitor-watch. Kept: each saved change names its competitor with it.
     tags: [APP_TAG, `cw:${competitor.slug}`, `kind:${kind}`],
     ...(options.webhookUrl ? { webhook: webhookParams(options.webhookUrl) } : {}),
   };

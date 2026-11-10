@@ -65,7 +65,7 @@ describe("Slack message", () => {
   it("lists each change with its competitor, type, linked title and old -> new, escaping Slack's characters", () => {
     const { text } = slackMessage([event({ title: "Plans <new> & improved" })], "https://watch.example");
     expect(text).toBe(
-      "*Competitor Watch* · 1 new change\n" +
+      "*Watch Competitor* · 1 new change\n" +
         "• *Acme Notes* · Pricing · <https://watch.example/c/acme-notes|Plans &lt;new&gt; &amp; improved>\n" +
         "   $8 → $10",
     );
@@ -75,7 +75,7 @@ describe("Slack message", () => {
     const many = Array.from({ length: MAX_ITEMS + 3 }, (_, i) => event({ id: `e${i}` }));
     const { text } = slackMessage(many, null);
     expect(text.match(/^• /gm)).toHaveLength(MAX_ITEMS);
-    expect(text.endsWith("+3 more in Competitor Watch")).toBe(true);
+    expect(text.endsWith("+3 more in Watch Competitor")).toBe(true);
     // Without APP_URL, links go to the source page.
     expect(text).toContain("<https://acme-notes.example/pricing|");
   });

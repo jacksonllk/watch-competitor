@@ -1,4 +1,4 @@
-# competitor-watch
+# Watch Competitor
 
 A free, self-hosted alternative to paid competitive intelligence tools. Add a competitor. It watches their changelog, pricing page and news. When something you care about changes, it tells you in Slack and gives you a ready prompt for your AI agent.
 

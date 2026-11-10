@@ -147,7 +147,7 @@ export const webHop: FetchHop = async (url) => {
     const res = await fetch(url, {
       redirect: "manual",
       signal: AbortSignal.timeout(TIMEOUT_MS),
-      headers: { "user-agent": "competitor-watch" },
+      headers: { "user-agent": "watch-competitor" },
     });
     await res.body?.cancel();
     return { status: res.status, location: res.headers.get("location") };

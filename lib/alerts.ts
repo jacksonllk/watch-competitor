@@ -2,7 +2,7 @@
  * Slack alerts for new changes. Plug in a Slack Incoming Webhook URL as SLACK_WEBHOOK_URL and they are on.
  * After the app saves new changes (a monitor run, the daily news check), it posts them in one message.
  * Each change is posted once. Nothing from before alerts were turned on is posted.
- * Which changes alert comes from the `alerts` settings in competitor-watch.config.json. Extend sendAlerts to add channels.
+ * Which changes alert comes from the `alerts` settings in watch-competitor.config.json. Extend sendAlerts to add channels.
  */
 import type { CompetitorRecord } from "./competitors";
 import type { Config } from "./config";
@@ -54,7 +54,7 @@ function detail(event: CompetitorEvent): string {
 export function slackMessage(events: CompetitorEvent[], appUrl: string | null): { text: string } {
   const shown = events.slice(0, MAX_ITEMS);
   const link = (e: CompetitorEvent) => (appUrl ? `${appUrl.replace(/\/$/, "")}/c/${e.competitor.slug}` : e.url);
-  const lines = [`*Competitor Watch* · ${events.length} new ${events.length === 1 ? "change" : "changes"}`];
+  const lines = [`*Watch Competitor* · ${events.length} new ${events.length === 1 ? "change" : "changes"}`];
   for (const e of shown) {
     lines.push(`• *${escape(e.competitor.name)}* · ${e.label ?? TYPE[e.kind]} · <${link(e)}|${escape(e.title)}>`);
     const more = detail(e);
@@ -62,7 +62,7 @@ export function slackMessage(events: CompetitorEvent[], appUrl: string | null): 
   }
   if (events.length > shown.length) {
     const rest = events.length - shown.length;
-    lines.push(appUrl ? `+${rest} more in <${appUrl}|Competitor Watch>` : `+${rest} more in Competitor Watch`);
+    lines.push(appUrl ? `+${rest} more in <${appUrl}|Watch Competitor>` : `+${rest} more in Watch Competitor`);
   }
   return { text: lines.join("\n") };
 }
