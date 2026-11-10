@@ -46,11 +46,22 @@ function shortPair(before: string | null, after: string | null) {
  * Page text arrives with table cells glued together: "sandboxes20 concurrent", "concurrentIncludedPro", "/moPro".
  * Splits a line into its cells at those joins, drops a list marker and a cell repeated right after itself.
  * A join needs 4 lowercase letters before it, so names like GitHub, JavaScript and gpt4o stay whole.
+ * Changelogs also glue a date to its title ("Nov 9Faster builds") and a capitalised word to the next sentence
+ * ("HTTPThis week"): those split too. An all-caps word needs 2 capitals before the join, so OAuth and SDKs stay whole.
  */
+const JOIN = new RegExp(
+  [
+    "(?<=[a-z]{4})(?=[A-Z][a-z]|\\d|\\+?[$€£])",
+    "(?<=\\/(?:mo|yr|month|year))(?=[A-Z])",
+    "(?<=(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\\.? \\d{1,2})(?=[A-Z])",
+    "(?<=[A-Z]{2})(?=[A-Z][a-z]{2})",
+  ].join("|"),
+);
+
 export function cells(line: string): string[] {
   const text = line.replace(/^[-*•]\s+/, "");
   const parts = text
-    .split(/(?<=[a-z]{4})(?=[A-Z][a-z]|\d|\+?[$€£])|(?<=\/(?:mo|yr|month|year))(?=[A-Z])/)
+    .split(JOIN)
     .map((p) => p.trim())
     .filter(Boolean);
   return parts.filter((p, i) => i === 0 || p.toLowerCase() !== parts[i - 1].toLowerCase());

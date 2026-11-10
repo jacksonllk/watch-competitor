@@ -3,7 +3,7 @@ import { articleToEvent, toEvent } from "@/lib/events";
 import { fixtureChanges, longChange } from "@/lib/fixtures/changes";
 import { fixtureCompetitors } from "@/lib/fixtures/competitors";
 import { fixtureNewsSearch } from "@/lib/fixtures/preview";
-import { MAX_ROWS, readDiff, ROW_TEXT_LIMIT, rowText, whatChanged } from "@/lib/what-changed";
+import { cells, MAX_ROWS, readDiff, ROW_TEXT_LIMIT, rowText, whatChanged } from "@/lib/what-changed";
 
 const byId = (id: string) =>
   toEvent(
@@ -35,6 +35,23 @@ describe("readDiff", () => {
 
   it("ignores lines without + or -, empty lines and unchanged values", () => {
     expect(readDiff("Team plan\n+ \n- Team: $8\n+ Team: $8")).toEqual([]);
+  });
+
+  it("splits a date glued to a title and a capitalised word glued to the next sentence", () => {
+    expect(cells("WeeklyNov 9Faster Builds & Team RolesThis week ships faster builds in the CLI.")).toEqual([
+      "Weekly",
+      "Nov 9",
+      "Faster Builds & Team Roles",
+      "This week ships faster builds in the CLI.",
+    ]);
+    expect(cells("Aug 17Workload Identity & Faster Python HTTPThis week moves the SDK.")).toEqual([
+      "Aug 17",
+      "Workload Identity & Faster Python HTTP",
+      "This week moves the SDK.",
+    ]);
+    // Names stay whole.
+    expect(cells("Sign in with OAuth on GitHub, then call the SDKs")).toEqual(["Sign in with OAuth on GitHub, then call the SDKs"]);
+    expect(cells("Released Nov 9, 2026")).toEqual(["Released Nov 9, 2026"]);
   });
 
   it("splits glued page cells, pairs similar lines and shows only what differs", () => {
