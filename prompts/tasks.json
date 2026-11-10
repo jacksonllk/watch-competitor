@@ -1,0 +1,96 @@
+{
+  "pricing": [
+    {
+      "id": "assess",
+      "label": "Assess and recommend",
+      "outcome": "Asks your agent to assess this price change and recommend what to do.",
+      "instruction": "State what changed in one line, with numbers. Compare it with our pricing for the same kind of customer. Say whether it is a threat, an opportunity or neither for us, and why. Recommend what we should do, if anything, and how soon."
+    },
+    {
+      "id": "comparison",
+      "label": "Update our comparison with {{name}}",
+      "instruction": "Find every page and doc where we compare ourselves with {{name}} or quote their prices (search our repo and site for \"{{name}}\"). For each, give the file or URL, the claim that is now wrong and the corrected text as a diff. If you find none, say so."
+    },
+    {
+      "id": "sales",
+      "label": "Write talking points for sales",
+      "instruction": "Write three talking points sales can use when a prospect brings this up. Keep each under 25 words and honest. If we have a battlecard for {{name}}, give its edits too."
+    },
+    {
+      "id": "win",
+      "label": "Draft an offer for {{name}} users this change affects",
+      "instruction": "Say which {{name}} customers this change affects, and how much. Draft a social post (under 60 words) and an email (under 120 words, with a subject line) inviting them to try us, with an offer we can actually make. Make no claim we cannot back."
+    },
+    {
+      "id": "pricing",
+      "label": "Weigh a change to our own pricing",
+      "instruction": "Set out three options for our pricing: match, hold, or set ourselves apart. For each, give the likely effect on our revenue and on deals against {{name}}. Recommend one."
+    },
+    {
+      "id": "team",
+      "label": "Write a note for the team",
+      "instruction": "Write a note for our team chat, five lines at most: what changed, what it means for us and what we will do."
+    }
+  ],
+  "changelog": [
+    {
+      "id": "assess",
+      "label": "Assess and recommend",
+      "outcome": "Asks your agent to check if you have this, assess it and recommend what to do.",
+      "instruction": "Say in plain words what launched and who it is for. Check whether we have it (read our repo and docs, or ask me), and be honest about any gap. Say whether it is a threat, an opportunity or neither, and which of our customers or prospects would care. Recommend what we should do, if anything, and how soon."
+    },
+    {
+      "id": "roadmap",
+      "label": "Draft a roadmap issue if we lack this",
+      "instruction": "If we lack this, draft an issue for our tracker: a title, the problem it solves, who has asked for it (search our issues and notes), a rough size and the open questions. If we already have it, say so and skip this."
+    },
+    {
+      "id": "comparison",
+      "label": "Update our comparison with {{name}}",
+      "instruction": "Find every page and doc where we compare features with {{name}} (search our repo and site for \"{{name}}\"). For each, give the file or URL and the edit as a diff, including a row for this feature. If you find none, say so."
+    },
+    {
+      "id": "sales",
+      "label": "Write talking points for sales",
+      "instruction": "Write the answer sales can give when a prospect asks if we have this. Keep it under 60 words and honest about any gap. If we have a battlecard for {{name}}, give its edits too."
+    },
+    {
+      "id": "reply",
+      "label": "Draft a post about our version, if we have one",
+      "instruction": "If we already have this, draft a social post (under 60 words) and a docs note that show our version, linking our docs. If we do not, say so and skip this."
+    },
+    {
+      "id": "team",
+      "label": "Write a note for the team",
+      "instruction": "Write a note for our team chat, five lines at most: what launched, what it means for us and what we will do."
+    }
+  ],
+  "news": [
+    {
+      "id": "assess",
+      "label": "Assess and recommend",
+      "outcome": "Asks your agent to assess this news and recommend what to do.",
+      "instruction": "Say what happened in one line. Explain why it may matter to us, including the likely effect on our deals in the next 90 days. Recommend what we should do this week, or say that we should just watch."
+    },
+    {
+      "id": "sales",
+      "label": "Write talking points for sales",
+      "instruction": "Write three factual talking points sales can use when a prospect brings this up. Keep each under 25 words."
+    },
+    {
+      "id": "reach",
+      "label": "Draft an outreach email to {{name}}'s customers",
+      "instruction": "If this news may unsettle {{name}}'s customers (an outage, a price rise, an acquisition, layoffs), draft a short, respectful outreach email with a subject line, and say who should get it. If not, say so and skip this."
+    },
+    {
+      "id": "investors",
+      "label": "Write a line for our investor update",
+      "instruction": "If this matters to our investors (a funding round, a big customer, an acquisition), write one or two lines for our next investor update: what happened and our take. If not, say so and skip this."
+    },
+    {
+      "id": "team",
+      "label": "Write a note for the team",
+      "instruction": "Write a note for our team chat, five lines at most: what happened, what it means for us and what we will do."
+    }
+  ]
+}

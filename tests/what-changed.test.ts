@@ -5,7 +5,11 @@ import { fixtureCompetitors } from "@/lib/fixtures/competitors";
 import { fixtureNewsSearch } from "@/lib/fixtures/preview";
 import { MAX_ROWS, readDiff, ROW_TEXT_LIMIT, rowText, whatChanged } from "@/lib/what-changed";
 
-const byId = (id: string) => toEvent(fixtureChanges.find((c) => c.id === id)!, fixtureCompetitors)!;
+const byId = (id: string) =>
+  toEvent(
+    fixtureChanges.find((c) => c.id === id)!,
+    fixtureCompetitors,
+  )!;
 
 describe("readDiff", () => {
   it("pairs removed and added lines with the same label into old -> new rows", () => {
@@ -31,6 +35,23 @@ describe("readDiff", () => {
 
   it("ignores lines without + or -, empty lines and unchanged values", () => {
     expect(readDiff("Team plan\n+ \n- Team: $8\n+ Team: $8")).toEqual([]);
+  });
+
+  it("splits glued page cells, pairs similar lines and shows only what differs", () => {
+    // The shape of a real pricing page diff (9 Nov), with made-up plans.
+    const diff = [
+      "- - 20 meeting notes20 meeting notesThe most notes you can keep at once.",
+      "+ - 10 meeting notes10 meeting notesThe most notes you can keep at once.",
+      "- Starter · 20 notesIncludedTeam · 100 notesIncludedTeam+ · 600 notes+$50/moScale · 1,100 notes+$100/mo",
+      "+ Starter · 10 notesIncludedTeam · 100 notesIncludedTeam+ · 600 notes+$50/moScale · 1,100 notes+$100/mo",
+    ].join("\n");
+    expect(readDiff(diff)).toEqual([{ type: "changed", label: null, before: "Starter · 20 notes", after: "Starter · 10 notes" }]);
+  });
+
+  it("keeps names with capitals inside them whole", () => {
+    expect(readDiff("+ Sync with GitHub and JavaScript SDKs for gpt4o")).toEqual([
+      { type: "added", text: "Sync with GitHub and JavaScript SDKs for gpt4o" },
+    ]);
   });
 
   it("matches labels regardless of case and cuts long rows", () => {

@@ -33,6 +33,8 @@ const LAST_SEGMENT: Record<PageKind, RegExp> = {
 function candidates(kind: PageKind, domain: string): URL[] {
   const urls = PATHS[kind].map((path) => new URL(`https://${domain}${path}`));
   if (kind === "changelog") urls.push(new URL(`https://changelog.${domain}/`), new URL(`https://docs.${domain}/changelog`));
+  // Some keep pricing in their docs, such as docs.boat.dev/pricing (checked 9 Nov). The main site's page still wins.
+  if (kind === "pricing") urls.push(new URL(`https://docs.${domain}/pricing`));
   return urls;
 }
 
@@ -145,3 +147,20 @@ export const webHop: FetchHop = async (url) => {
     return null;
   }
 };
+
+/**
+ * Checks an address the user typed, such as "acme.com/changelog". Returns the final address after
+ * redirects when the page answers 200, else null. Free: plain requests, no context.dev call.
+ */
+export async function checkAddress(input: string, fetchHop: FetchHop = webHop): Promise<string | null> {
+  const text = input.trim();
+  if (!text || /\s/.test(text)) return null;
+  let url: URL;
+  try {
+    url = new URL(/^https?:\/\//i.test(text) ? text : `https://${text}`);
+  } catch {
+    return null;
+  }
+  const final = await resolve(url, fetchHop);
+  return final ? final.href : null;
+}

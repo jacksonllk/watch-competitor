@@ -10,6 +10,8 @@ export type CompetitorRecord = Competitor & {
   description: string | null;
   /** Extra words for the monitors' instructions, such as "Only report changes about sandboxes." */
   focus: string | null;
+  /** False when the user chose to watch without news, for example when the news is about another company. */
+  news?: boolean;
   addedAt: string;
   status: "watching" | "removed";
   removedAt: string | null;

@@ -1,0 +1,291 @@
+/*
+ * oss-kitchen UI base. Copy into each app as app/ui-base.css and import it after Tailwind in globals.css.
+ * Rules and reasons: ui-base.md in this folder. Change this master copy first, then copy it to the apps.
+ * Plain CSS, no dependencies. Each app sets its own colours, then uses these sizes, motions and states.
+ */
+
+/* Type scale. Fluid between a 360px and a 1440px viewport, so text shrinks on phones and never grows past the max. */
+:root {
+  --fs-display: clamp(1.5rem, 1.15rem + 1.1vw, 2rem); /* 24 to 32: page title, one per page */
+  --fs-value: clamp(1.125rem, 1rem + 0.4vw, 1.375rem); /* 18 to 22: readout numbers */
+  --fs-heading: 0.9375rem; /* 15: section and panel titles */
+  --fs-body: clamp(0.8125rem, 0.79rem + 0.1vw, 0.875rem); /* 13 to 14: body, row titles, buttons, inputs */
+  --fs-small: 0.75rem; /* 12: meta, help text, dates */
+  --fs-label: 0.6875rem; /* 11: uppercase labels */
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 120ms; /* hover, press */
+  --duration-panel: 240ms; /* panels and overlays */
+
+  --control-h: 2.25rem; /* 36: buttons and inputs */
+  --control-h-sm: 2rem; /* 32: chips, small buttons */
+  --gutter: clamp(1rem, 0.6rem + 1.6vw, 2rem); /* 16 to 32: page side padding */
+}
+
+/* Every clickable thing shows the pointer. Tailwind v4 no longer sets it for buttons. */
+a[href],
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+[role="tab"],
+summary,
+label[for],
+select,
+input[type="checkbox"],
+input[type="radio"] {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* No tap flash on phones, no default outlines. */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+:focus {
+  outline: none;
+}
+
+/* Keyboard focus ring on buttons and links only. Fields show focus with .ui-field instead. */
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--focus-ring, rgb(27 36 48 / 0.35));
+  outline-offset: 2px;
+}
+
+/*
+ * Text fields: put .ui-field on the input, or on the box that wraps an input and an icon.
+ * Hover darkens the border. Focus darkens it more and adds a soft grey halo. Never a blue ring.
+ */
+.ui-field {
+  border: 1px solid var(--field-border, #d5dae1);
+  background: var(--field-bg, #fff);
+  transition-property: border-color, box-shadow;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--ease-out);
+}
+.ui-field:hover {
+  border-color: var(--field-border-hover, #b4bcc7);
+}
+.ui-field:focus,
+.ui-field:focus-within {
+  border-color: var(--field-border-focus, #a3acb8);
+  box-shadow: 0 0 0 3px var(--field-halo, rgb(27 36 48 / 0.06));
+}
+.ui-field input,
+.ui-field textarea {
+  outline: none;
+  background: transparent;
+}
+
+/* Quick, quiet feedback on anything interactive. */
+a,
+button,
+input,
+textarea,
+select {
+  transition-property: color, background-color, border-color, box-shadow, opacity;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--ease-out);
+}
+button:not(:disabled):active {
+  transform: translateY(0.5px);
+}
+
+/* Side panel from the right: add .is-open on the next frame to slide in, remove it to slide out. */
+.ui-overlay {
+  opacity: 0;
+  transition: opacity var(--duration-panel) var(--ease-out);
+}
+.ui-overlay.is-open {
+  opacity: 1;
+}
+.ui-sheet {
+  transform: translateX(100%);
+  transition: transform var(--duration-panel) var(--ease-out);
+  will-change: transform;
+}
+.ui-sheet.is-open {
+  transform: translateX(0);
+}
+
+/* Centered modal: add .is-open on the next frame to fade and scale in. */
+.ui-modal {
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
+  transition:
+    opacity var(--duration-panel) var(--ease-out),
+    transform var(--duration-panel) var(--ease-out);
+}
+.ui-modal.is-open {
+  opacity: 1;
+  transform: none;
+}
+
+/* Content that arrives later (a preview, search results) fades in instead of popping. */
+@keyframes ui-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.ui-fade-in {
+  animation: ui-fade-in 180ms var(--ease-out) both;
+}
+
+/* Key hint chip, such as Enter inside a field or Esc next to a close button. Show it only when the key works now. */
+.ui-kbd {
+  display: inline-flex;
+  align-items: center;
+  height: 1.25rem;
+  padding: 0 0.375rem;
+  border: 1px solid var(--field-border, #d5dae1);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  font-size: var(--fs-label);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--muted, #6b7686);
+  background: #fff;
+  user-select: none;
+}
+
+/* Paging through time (weeks, months): the new content slides in from the side the user moved to. */
+@keyframes ui-slide-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+@keyframes ui-slide-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+}
+.ui-slide-next {
+  animation: ui-slide-from-right 220ms var(--ease-out) both;
+}
+.ui-slide-prev {
+  animation: ui-slide-from-left 220ms var(--ease-out) both;
+}
+/* Scoped: only parts marked .ui-slide-item move (the day cells), labels beside them (names, logos) stay still. */
+.ui-slide-scope-next .ui-slide-item {
+  animation: ui-slide-from-right 220ms var(--ease-out) both;
+}
+.ui-slide-scope-prev .ui-slide-item {
+  animation: ui-slide-from-left 220ms var(--ease-out) both;
+}
+
+/* A row the user jumped to, such as a Feed row picked on the timeline: a brief highlight that fades out. */
+@keyframes ui-flash {
+  from {
+    background-color: var(--accent-tint, #f1f5ff);
+    box-shadow: inset 3px 0 0 var(--accent, #0047ff);
+  }
+}
+.ui-flash {
+  animation: ui-flash 1.6s var(--ease-out) both;
+}
+
+/* While dragging a timeline or resizing a range, the cursor stays the same everywhere and no text gets selected. */
+html.ui-grabbing,
+html.ui-grabbing * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+html.ui-resizing,
+html.ui-resizing * {
+  cursor: ew-resize !important;
+  user-select: none !important;
+}
+
+/* Popovers and menus: a quick drop from their button. */
+@keyframes ui-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.985);
+  }
+}
+.ui-pop {
+  animation: ui-pop 140ms var(--ease-out) both;
+  transform-origin: top right;
+}
+
+/* A row that scrolls sideways (chips on a phone) without showing a scrollbar. */
+.ui-scroll-x {
+  scrollbar-width: none;
+}
+.ui-scroll-x::-webkit-scrollbar {
+  display: none;
+}
+
+/* Placeholder blocks while content loads. */
+@keyframes ui-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+.ui-skeleton {
+  border-radius: 4px;
+  background: linear-gradient(90deg, #eef0f3 25%, #f6f7f9 50%, #eef0f3 75%);
+  background-size: 200% 100%;
+  animation: ui-shimmer 1.4s linear infinite;
+}
+
+/* A 14px spinner for buttons and fields. Takes the text colour. */
+@keyframes ui-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.ui-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  opacity: 0.6;
+  animation: ui-spin 0.7s linear infinite;
+}
+
+/* Small notice in the bottom right that leaves on its own. */
+@keyframes ui-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+.ui-toast {
+  animation: ui-toast-in 200ms var(--ease-out) both;
+}
+
+::selection {
+  background: rgb(0 71 255 / 0.14);
+}
+
+/* Numbers that should line up: counts, credits, times. Not on ISO dates or domains: Inter's tabular figures widen hyphens. */
+.figures {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Centres button labels optically. */
+.btn-label {
+  text-box: trim-both cap alphabetic;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}

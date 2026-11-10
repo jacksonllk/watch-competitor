@@ -116,14 +116,23 @@ describe("checkNews", () => {
     const store = createMemoryStore();
     const { api } = fakeContext({ newsError: apiError(404, "NOT_FOUND") });
     await checkNews(store, api.news, acme, now);
-    expect(await store.get<NewsCheck>(newsCheckKey("acme-notes"))).toEqual({ at: now.toISOString(), ok: false, reason: "no_news_source", nextRefillAt: null });
+    expect(await store.get<NewsCheck>(newsCheckKey("acme-notes"))).toEqual({
+      at: now.toISOString(),
+      ok: false,
+      reason: "no_news_source",
+      nextRefillAt: null,
+    });
   });
 
   it("says why it did not work: out of credits (402), with the refill date", async () => {
     const store = createMemoryStore();
     const { api } = fakeContext({ newsError: apiError(402, "USAGE_EXCEEDED", { next_refill_at: "2026-12-01T08:01:00Z" }) });
     await checkNews(store, api.news, acme, now);
-    expect(await store.get<NewsCheck>(newsCheckKey("acme-notes"))).toMatchObject({ ok: false, reason: "out_of_credits", nextRefillAt: "2026-12-01T08:01:00Z" });
+    expect(await store.get<NewsCheck>(newsCheckKey("acme-notes"))).toMatchObject({
+      ok: false,
+      reason: "out_of_credits",
+      nextRefillAt: "2026-12-01T08:01:00Z",
+    });
   });
 });
 
@@ -142,7 +151,12 @@ describe("addCompetitor", () => {
   it("creates monitors only for found pages, saves the competitor and checks its news", async () => {
     const store = createMemoryStore();
     const { api, created, searched, brandSearched } = fakeContext({ articles: fixtureNewsSearch.data });
-    const result = await addCompetitor(store, api, { domain: "https://www.Acme-Notes.example/" }, { fetchHop: web, now: new Date("2026-11-09T06:00:00Z") });
+    const result = await addCompetitor(
+      store,
+      api,
+      { domain: "https://www.Acme-Notes.example/" },
+      { fetchHop: web, now: new Date("2026-11-09T06:00:00Z") },
+    );
     expect(result.status).toBe("added");
     if (result.status !== "added") return;
     expect(result.competitor).toMatchObject({ slug: "acme-notes", name: "Acme Notes", domain: "acme-notes.example", status: "watching" });
@@ -179,5 +193,32 @@ describe("addCompetitor", () => {
     });
     expect(created).toHaveLength(0);
     expect(brandSearched).toHaveLength(0);
+  });
+});
+
+describe("one article per story", () => {
+  it("treats the same day and a similar title as the same story", async () => {
+    const { keepArticles } = await import("@/lib/news");
+    const base = { ...fixtureNewsSearch.data[0], published_at: "2026-11-05T10:00:00Z" };
+    const a = {
+      ...base,
+      id: "a",
+      story_id: "s1",
+      title: "E2B, Which Gives AI Agents Their Own Cloud Computers, Passes $120 Million in Annualized Run Rate",
+    };
+    const b = {
+      ...base,
+      id: "b",
+      story_id: "s2",
+      title: "E2B, Which Gives AI Agents Their Own Cloud Computers, Passes $120 Million in Annual Recurring Revenue",
+    };
+    const c = {
+      ...base,
+      id: "c",
+      story_id: "s3",
+      published_at: "2026-11-06T10:00:00Z",
+      title: "E2B, Which Gives AI Agents Their Own Cloud Computers, Passes a milestone",
+    };
+    expect(keepArticles([], [a, b, c]).map((x) => x.id)).toEqual(["c", "a"]);
   });
 });

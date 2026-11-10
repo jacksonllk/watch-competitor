@@ -37,7 +37,12 @@ describe("toEvent", () => {
     const change = byId("chg_fx_acme_price");
     expect(toEvent({ ...change, tags: ["cw:acme-notes"] }, fixtureCompetitors)).toBeNull();
     expect(toEvent({ ...change, tags: ["competitor-watch", "kind:pricing"] }, fixtureCompetitors)).toBeNull();
-    expect(toEvent(change, fixtureCompetitors.filter((c) => c.slug !== "acme-notes"))).toBeNull();
+    expect(
+      toEvent(
+        change,
+        fixtureCompetitors.filter((c) => c.slug !== "acme-notes"),
+      ),
+    ).toBeNull();
   });
 
   it("ignores unknown kind tags and the bare cw tag", () => {

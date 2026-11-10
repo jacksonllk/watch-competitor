@@ -27,6 +27,8 @@ export type CompetitorEvent = {
   diff: string | null;
   /** Competitor text: the diff for a page, or the article text for news. Untrusted. */
   excerpt: string | null;
+  /** "changelog": read from their changelog page as a past launch, not detected by a monitor. */
+  origin?: "changelog";
 };
 
 const KINDS: EventKind[] = ["pricing", "changelog", "news"];

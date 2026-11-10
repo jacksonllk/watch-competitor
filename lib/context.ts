@@ -8,6 +8,11 @@ import type {
   BrandSearchResponse,
   MonitorCreateParams,
   MonitorGetLimitsResponse,
+  MonitorListParams,
+  MonitorListResponse,
+  MonitorRunResponse,
+  MonitorUpdateParams,
+  MonitorUpdateResponse,
   MonitorListAccountChangesParams,
   MonitorListAccountChangesResponse,
   MonitorListRunsParams,
@@ -22,11 +27,14 @@ export const APP_TAG = "competitor-watch";
 type Credits = { key_metadata?: { credits_consumed: number } };
 
 export type MonitorsApi = {
-  create(body: MonitorCreateParams): PromiseLike<{ id: string; initial_run_id: string | null } & Credits>;
+  create(body: MonitorCreateParams): PromiseLike<{ id: string; initial_run_id: string | null; webhook?: { secret?: string } | null } & Credits>;
   delete(monitorId: string): PromiseLike<unknown>;
   listAccountChanges(query: MonitorListAccountChangesParams): PromiseLike<MonitorListAccountChangesResponse>;
   listRuns(monitorId: string, query: MonitorListRunsParams): PromiseLike<MonitorListRunsResponse>;
   getLimits(): PromiseLike<MonitorGetLimitsResponse>;
+  list(query: MonitorListParams): PromiseLike<MonitorListResponse>;
+  run(monitorId: string): PromiseLike<MonitorRunResponse>;
+  update(monitorId: string, body: MonitorUpdateParams): PromiseLike<MonitorUpdateResponse>;
 };
 export type NewsApi = { search(body: NewsSearchParams): PromiseLike<NewsSearchResponse> };
 export type BrandApi = { search(query: BrandSearchParams): PromiseLike<BrandSearchResponse> };
@@ -48,6 +56,9 @@ export const USAGE_ROW = {
   limits: "/v1/monitors/limits",
   listRuns: "/monitors/{monitor_id}/runs",
   listChanges: "/monitors/changes",
+  listMonitors: "/monitors (list)",
+  runNow: "/monitors/{monitor_id}/run",
+  updateMonitor: "/monitors/{monitor_id} (update)",
 } as const;
 export type Usage = Record<string, { calls: number; credits: number }>;
 

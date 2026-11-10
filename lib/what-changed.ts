@@ -43,9 +43,49 @@ function shortPair(before: string | null, after: string | null) {
 }
 
 /**
+ * Page text arrives with table cells glued together: "sandboxes20 concurrent", "concurrentIncludedPro", "/moPro".
+ * Splits a line into its cells at those joins, drops a list marker and a cell repeated right after itself.
+ * A join needs 4 lowercase letters before it, so names like GitHub, JavaScript and gpt4o stay whole.
+ */
+export function cells(line: string): string[] {
+  const text = line.replace(/^[-*•]\s+/, "");
+  const parts = text
+    .split(/(?<=[a-z]{4})(?=[A-Z][a-z]|\d|\+?[$€£])|(?<=\/(?:mo|yr|month|year))(?=[A-Z])/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  return parts.filter((p, i) => i === 0 || p.toLowerCase() !== parts[i - 1].toLowerCase());
+}
+
+const words = (line: string) => new Set<string>(line.toLowerCase().match(/[a-z0-9$€£.,+]+/g) ?? []);
+function similarity(a: string, b: string): number {
+  const [x, y] = [words(a), words(b)];
+  const shared = [...x].filter((w) => y.has(w)).length;
+  return shared / Math.max(1, new Set([...x, ...y]).size);
+}
+
+/** The cells that differ between an old and a new line, with the cells both share left out. */
+function difference(before: string, after: string): { before: string; after: string } {
+  const [a, b] = [cells(before), cells(after)];
+  let start = 0;
+  while (start < a.length && start < b.length && a[start] === b[start]) start++;
+  let end = 0;
+  while (end < a.length - start && end < b.length - start && a[a.length - 1 - end] === b[b.length - 1 - end]) end++;
+  return { before: a.slice(start, a.length - end).join(" · "), after: b.slice(start, b.length - end).join(" · ") };
+}
+
+/** "20 -> 10": the numbers that left and the numbers that came, to spot one change the page shows twice. */
+function numberChange(row: { before: string; after: string }): string {
+  const nums = (t: string): string[] => t.match(/\d[\d,.]*/g) ?? [];
+  const [b, a] = [nums(row.before), nums(row.after)];
+  return `${b.filter((n) => !a.includes(n)).join(",")}->${a.filter((n) => !b.includes(n)).join(",")}`;
+}
+const names = (text: string) => (text.match(/\b[A-Z][a-z]+/g) ?? []).length;
+
+/**
  * Reads a context.dev diff into rows. The documented format: changed lines, each starting with + or -.
  * - A removed and an added line with the same label become one Changed row: "Team: $8 -> $10".
- * - Exactly one removed and one added line, with no label match, also become one Changed row.
+ * - Other removed lines pair with their most similar added line (or the only one), shown as the cells that differ.
+ * - A page that shows one change twice (a plan card and a summary bar) gives one row: the one that names more.
  * - Other added lines become New rows, other removed lines Removed rows.
  * Lines without + or - are ignored. Identical old and new lines are dropped.
  */
@@ -59,34 +99,58 @@ export function readDiff(diff: string): ChangeRow[] {
     (sign === "+" ? added : removed).push(text);
   }
 
-  const rows: ChangeRow[] = [];
+  const changed: Extract<ChangeRow, { type: "changed" }>[] = [];
   const usedAdded = new Set<number>();
   const leftRemoved: string[] = [];
 
   for (const old of removed) {
     const label = old.match(LABEL);
-    const match = label
-      ? added.findIndex((a, i) => !usedAdded.has(i) && a.match(LABEL)?.[1].toLowerCase() === label[1].toLowerCase())
-      : -1;
+    const match = label ? added.findIndex((a, i) => !usedAdded.has(i) && a.match(LABEL)?.[1].toLowerCase() === label[1].toLowerCase()) : -1;
     if (label && match >= 0) {
       usedAdded.add(match);
       const after = added[match].match(LABEL)![2];
-      if (after !== label[2]) rows.push({ type: "changed", label: clip(label[1]), before: clip(label[2]), after: clip(after) });
+      if (after !== label[2]) changed.push({ type: "changed", label: clip(label[1]), before: clip(label[2]), after: clip(after) });
     } else {
       leftRemoved.push(old);
     }
   }
-  const leftAdded = added.filter((_, i) => !usedAdded.has(i));
 
-  if (leftRemoved.length === 1 && leftAdded.length === 1) {
-    if (leftRemoved[0] !== leftAdded[0]) {
-      rows.push({ type: "changed", label: null, before: clip(leftRemoved[0]), after: clip(leftAdded[0]) });
+  const unpaired: string[] = [];
+  const onlyPair = leftRemoved.length === 1 && added.length - usedAdded.size === 1;
+  for (const old of leftRemoved) {
+    let best = -1;
+    let score = 0;
+    added.forEach((a, i) => {
+      if (usedAdded.has(i)) return;
+      const sim = onlyPair ? 1 : similarity(old, a);
+      if (sim > score) [best, score] = [i, sim];
+    });
+    if (best < 0 || score < 0.5) {
+      unpaired.push(old);
+      continue;
     }
-  } else {
-    rows.push(...leftAdded.map((text) => ({ type: "added" as const, text: clip(text) })));
-    rows.push(...leftRemoved.map((text) => ({ type: "removed" as const, text: clip(text) })));
+    usedAdded.add(best);
+    if (old === added[best]) continue;
+    const d = difference(old, added[best]);
+    if (d.before && d.after) changed.push({ type: "changed", label: null, before: clip(d.before), after: clip(d.after) });
+    else if (d.after) added.push(d.after);
+    else if (d.before) unpaired.push(d.before);
   }
-  return rows;
+
+  // One change shown twice on the page: keep the row that names more (a plan name), the first on a tie.
+  const kept: typeof changed = [];
+  for (const row of changed) {
+    const twin = row.label ? -1 : kept.findIndex((k) => !k.label && numberChange(k) === numberChange(row) && numberChange(row) !== "->");
+    if (twin < 0) kept.push(row);
+    else if (names(row.before) > names(kept[twin].before)) kept[twin] = row;
+  }
+
+  const clean = (text: string) => clip(cells(text).join(" · "));
+  return [
+    ...kept,
+    ...added.filter((_, i) => !usedAdded.has(i)).map((text) => ({ type: "added" as const, text: clean(text) })),
+    ...unpaired.map((text) => ({ type: "removed" as const, text: clean(text) })),
+  ];
 }
 
 /**

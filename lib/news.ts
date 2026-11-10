@@ -24,18 +24,93 @@ const MAX_PAGES = 3;
 export const newsKey = (slug: string) => `news:${slug}`;
 export const newsCheckKey = (slug: string) => `newscheck:${slug}`;
 
+/** Below this share of articles naming the company, the News API matched the wrong company. */
+export const TRUST_SHARE = 0.5;
+
+/**
+ * The News API finds a company's news by matching its domain to a company in its own index, and for small companies
+ * with a common-word name it can match the wrong one (9 Nov: boat.dev matched boAt, an electronics brand).
+ * Keeps articles that name the company with its exact capitalisation, or its domain. When fewer than half do,
+ * the whole result is about another company: trusted is false and nothing is kept, the same as finding no news.
+ * A quoted-domain search ("boat.dev") was tested on 9 Nov and found only passing mentions in other companies' stories,
+ * so it is not used.
+ * Checked offline on 9 Nov: E2B 2 of 2, Daytona 9 of 10, Modal 7 of 8 kept, boat.dev 1 of 9. The share is unverified beyond these.
+ */
+export function relevantArticles(articles: Article[], name: string, domain: string): { articles: Article[]; trusted: boolean } {
+  if (!articles.length) return { articles, trusted: true };
+  const word = new RegExp(`(?<![A-Za-z0-9])${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![A-Za-z0-9])`);
+  const kept = articles.filter((a) => {
+    const text = `${a.title} ${a.description ?? ""}`;
+    return word.test(text) || text.toLowerCase().includes(domain.toLowerCase());
+  });
+  const trusted = kept.length / articles.length >= TRUST_SHARE;
+  return { articles: trusted ? kept : [], trusted };
+}
+
+/**
+ * The same story told twice: the same day and titles that start alike (9 Nov: two Business Wire releases about E2B on
+ * 5 Nov, and two copies of one Daytona headline, each with its own story_id).
+ */
+export const storyKey = (a: Article) =>
+  `${(a.published_at ?? "").slice(0, 10)} ${a.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 40)}`;
+
+/** One article per story, keeping the first (newest first in, newest first out). */
+export function oneStoryEach(articles: Article[]): Article[] {
+  const seen = new Set<string>();
+  return articles.filter((a) => {
+    const keys = [a.story_id, storyKey(a)];
+    if (keys.some((k) => seen.has(k))) return false;
+    keys.forEach((k) => seen.add(k));
+    return true;
+  });
+}
+
 /** Articles mainly about the company, newest first, one per story, no repeats. */
 export function keepArticles(existing: Article[], incoming: Article[]): Article[] {
   const ids = new Set(existing.map((a) => a.id));
-  const stories = new Set(existing.map((a) => a.story_id));
+  const stories = new Set(existing.flatMap((a) => [a.story_id, storyKey(a)]));
   const kept = [...existing];
   for (const article of incoming) {
-    if (article.match?.level !== "primary" || ids.has(article.id) || stories.has(article.story_id)) continue;
+    if (article.match?.level !== "primary" || ids.has(article.id) || stories.has(article.story_id) || stories.has(storyKey(article))) continue;
     ids.add(article.id);
     stories.add(article.story_id);
+    stories.add(storyKey(article));
     kept.push(article);
   }
   return kept.sort((a, b) => (b.published_at ?? "").localeCompare(a.published_at ?? ""));
+}
+
+export type NewsSearchResult =
+  | { ok: true; articles: Article[]; credits: number }
+  | { ok: false; reason: NonNullable<NewsCheck["reason"]>; nextRefillAt: string | null; credits: number };
+
+/** News about one domain since `from` (epoch ms), newest first, up to 3 pages of 10. Never throws for an API error. */
+export async function searchNews(api: NewsApi, domain: string, from: number, usage: Usage = {}): Promise<NewsSearchResult> {
+  const found: Article[] = [];
+  let credits = 0;
+  let cursor: string | null = null;
+  try {
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const res = await api.search({
+        searchBy: { type: "entity", entity: { type: "domain", domain } },
+        filterBy: { date: { from } },
+        sortBy: { type: "newest" },
+        limit: 10,
+        cursor,
+        tags: [APP_TAG],
+      });
+      credits += creditsOf(res);
+      recordCall(usage, USAGE_ROW.news, res);
+      found.push(...res.data);
+      if (!res.has_more || !res.next_cursor) break;
+      cursor = res.next_cursor;
+    }
+  } catch (error) {
+    const failure = failureOf(error);
+    const reason = failure.status === 404 ? "no_news_source" : failure.status === 402 ? "out_of_credits" : "failed";
+    return { ok: false, reason, nextRefillAt: failure.nextRefillAt, credits };
+  }
+  return { ok: true, articles: found, credits };
 }
 
 /**
@@ -53,36 +128,19 @@ export async function checkNews(
   if (last && now.getTime() - Date.parse(last.at) < DAY_MS - 60_000) return { checked: false, saved: 0, credits: 0 };
 
   const from = last?.ok ? Date.parse(last.at) : Date.parse(competitor.addedAt) - 90 * DAY_MS;
-  const found: Article[] = [];
-  let credits = 0;
-  let cursor: string | null = null;
-  try {
-    for (let page = 0; page < MAX_PAGES; page++) {
-      const res = await api.search({
-        searchBy: { type: "entity", entity: { type: "domain", domain: competitor.domain } },
-        filterBy: { date: { from } },
-        sortBy: { type: "newest" },
-        limit: 10,
-        cursor,
-        tags: [APP_TAG],
-      });
-      credits += creditsOf(res);
-      recordCall(usage, USAGE_ROW.news, res);
-      found.push(...res.data);
-      if (!res.has_more || !res.next_cursor) break;
-      cursor = res.next_cursor;
-    }
-  } catch (error) {
-    const failure = failureOf(error);
-    const reason = failure.status === 404 ? "no_news_source" : failure.status === 402 ? "out_of_credits" : "failed";
+  const result = await searchNews(api, competitor.domain, from, usage);
+  if (!result.ok) {
     await store.set<NewsCheck>(newsCheckKey(competitor.slug), {
       at: now.toISOString(),
       ok: false,
-      reason,
-      nextRefillAt: failure.nextRefillAt,
+      reason: result.reason,
+      nextRefillAt: result.nextRefillAt,
     });
-    return { checked: true, saved: 0, credits };
+    return { checked: true, saved: 0, credits: result.credits };
   }
+  const { articles: searched, credits } = result;
+  // Articles about another company count as no news: nothing is saved and the check still worked.
+  const found = relevantArticles(searched, competitor.name, competitor.domain).articles;
 
   const existing = (await store.get<Article[]>(newsKey(competitor.slug))) ?? [];
   const kept = keepArticles(existing, found);

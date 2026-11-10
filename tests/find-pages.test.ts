@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accepts, findPages, isPrivateAddress, resolve, type FetchHop, type Hop } from "@/lib/find-pages";
+import { accepts, findPage, findPages, isPrivateAddress, resolve, type FetchHop, type Hop } from "@/lib/find-pages";
 
 /** A made-up web: address -> answer. Anything not listed answers 404. */
 function fakeWeb(routes: Record<string, Hop | null>): FetchHop {
@@ -108,5 +108,16 @@ describe("isPrivateAddress", () => {
       expect(isPrivateAddress(ip)).toBe(true);
     }
     expect(isPrivateAddress("93.184.216.34")).toBe(false);
+  });
+});
+
+describe("pricing in the docs", () => {
+  it("finds docs.<domain>/pricing when the main site has none, and prefers the main site's page", async () => {
+    const only = async (live: string[]) => async (url: URL) =>
+      live.includes(url.href) ? { status: 200, location: null } : { status: 404, location: null };
+    const docsOnly = await findPage("pricing", "boat.example", await only(["https://docs.boat.example/pricing"]));
+    expect(docsOnly).toEqual({ url: "https://docs.boat.example/pricing", others: [] });
+    const both = await findPage("pricing", "boat.example", await only(["https://boat.example/pricing", "https://docs.boat.example/pricing"]));
+    expect(both).toEqual({ url: "https://boat.example/pricing", others: ["https://docs.boat.example/pricing"] });
   });
 });
