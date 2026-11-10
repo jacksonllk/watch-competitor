@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Run by hand to scan the whole history. A push scans only its own commits.
+  workflow_dispatch:
 
 # Read-only token: CI only checks out and checks the code. It can never push, tag or edit issues.
 permissions:
