@@ -12,7 +12,8 @@ const FAST_EVERY_MS = 10_000;
  * while the tab is visible (every 10 seconds while a first check runs). The server updates at most every 5 minutes
  * (15 seconds during a first check), and only with free reads.
  */
-export function Refresher({ stale, fast = false }: { stale: boolean; fast?: boolean }) {
+/** at: when the data on this page was last updated. A newer time from the server means something else updated it. */
+export function Refresher({ stale, fast = false, at = null }: { stale: boolean; fast?: boolean; at?: string | null }) {
   const router = useRouter();
   useEffect(() => {
     let alive = true;
@@ -20,10 +21,11 @@ export function Refresher({ stale, fast = false }: { stale: boolean; fast?: bool
       if (document.visibilityState !== "visible") return;
       fetch("/api/refresh", { method: "POST" })
         .then((r) => r.json())
-        .then((body: { status: string; savedChanges?: number; changedStates?: boolean }) => {
+        .then((body: { status: string; savedChanges?: number; changedStates?: boolean; at?: string | null }) => {
           if (!alive) return;
           // Redraw after any update, so "Updated … ago" and the statuses stay true. The page renders from the store in under 100 ms.
-          if (body.status === "failed" || body.status === "refreshed") router.refresh();
+          // Also when the data changed since this page was drawn (a webhook did it), even if this request found it fresh.
+          if (body.status === "failed" || body.status === "refreshed" || (body.at && body.at !== at)) router.refresh();
         })
         .catch(() => {});
     };
@@ -35,6 +37,6 @@ export function Refresher({ stale, fast = false }: { stale: boolean; fast?: bool
       clearInterval(timer);
       document.removeEventListener("visibilitychange", ask);
     };
-  }, [stale, fast, router]);
+  }, [stale, fast, at, router]);
   return null;
 }

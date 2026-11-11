@@ -1,5 +1,5 @@
 import { afterRefresh } from "@/lib/background";
-import { refresh } from "@/lib/refresh";
+import { loadSavedStates, refresh } from "@/lib/refresh";
 import { setup, setupError } from "@/lib/server";
 
 /**
@@ -11,6 +11,8 @@ export async function POST() {
   if (!ready.ok) return setupError(ready.problem);
   const result = await refresh(ready.store, ready.api.monitors);
   const after = await afterRefresh(ready.store, ready.api);
-  // A news check that saved articles counts as an update, so the open page redraws.
-  return Response.json(result.status === "fresh" && after.newsChecked ? { status: "refreshed", news: after.newsChecked } : result);
+  // at: when the data was last updated, by this request or anything else (a webhook, another tab). The open page
+  // redraws when it differs from what it shows. A news check that saved articles counts as an update too.
+  const at = (await loadSavedStates(ready.store))?.at ?? null;
+  return Response.json(result.status === "fresh" && after.newsChecked ? { status: "refreshed", news: after.newsChecked, at } : { ...result, at });
 }

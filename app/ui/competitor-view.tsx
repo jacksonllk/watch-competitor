@@ -20,6 +20,7 @@ import { ScrollRow } from "./scroll-row";
 import { ShowMore } from "./show-more";
 import { CompanyMark } from "./mark";
 import { EditAddressButton } from "./edit-address";
+import { Ago } from "./ago";
 import { HoverCard } from "./hover-card";
 import { SettingUp, setupSteps } from "./setting-up";
 import { ManageMonitorsButton, type ManagedMonitor } from "./manage-monitors";
@@ -52,7 +53,7 @@ export async function CompetitorView({
   return (
     <>
       <View page={page} templates={templates} tasks={tasks} now={now} config={config} />
-      <Refresher stale={isDue(saved, now)} fast={checkingFirstRuns(saved, now)} />
+      <Refresher stale={isDue(saved, now)} fast={checkingFirstRuns(saved, now)} at={saved?.at ?? null} />
     </>
   );
 }
@@ -132,10 +133,10 @@ function View({
           end={
             <>
               <Stat>
-                Last check <Value>{page.lastChecked ? relative(page.lastChecked, now) : "not yet"}</Value>
+                Last check <Value>{page.lastChecked ? <Ago iso={page.lastChecked} /> : "not yet"}</Value>
               </Stat>
               <Stat>
-                Next check <Value>{page.nextCheck ? relative(page.nextCheck, now) : "not scheduled"}</Value>
+                Next check <Value>{page.nextCheck ? <Ago iso={page.nextCheck} next /> : "not scheduled"}</Value>
               </Stat>
             </>
           }

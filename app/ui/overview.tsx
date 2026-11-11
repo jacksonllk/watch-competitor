@@ -14,6 +14,7 @@ import { KIND_NAME } from "./colors";
 import { dateTime, hostOf, relative, shortDate } from "./format";
 import { contextDevLink } from "@/lib/links";
 import { Footer } from "./context-dev";
+import { Ago } from "./ago";
 import { CompanyMark } from "./mark";
 import { SupportText } from "./support-text";
 import { OverviewBoard, type FeedItem } from "./overview-board";
@@ -60,7 +61,7 @@ export async function Overview({ searchParams }: { searchParams: Params }) {
         initial={{ ...range, filter }}
         earliest={earliest}
       />
-      <Refresher stale={isDue(saved, now)} fast={checkingFirstRuns(saved, now)} />
+      <Refresher stale={isDue(saved, now)} fast={checkingFirstRuns(saved, now)} at={saved?.at ?? null} />
     </>
   );
 }
@@ -97,8 +98,14 @@ function OverviewView({
     <>
       {showStaleWarning(saved, now) && (
         <p className={`text-body border-b border-rule bg-warn-tint ${PAD} py-2.5 text-warn`}>
-          {saved?.at ? `Last update ${relative(saved.at, now)}.` : "Not updated yet."} Next try in {retryMinutes}{" "}
-          {retryMinutes === 1 ? "minute" : "minutes"}.
+          {saved?.at ? (
+            <>
+              Last update <Ago iso={saved.at} />.
+            </>
+          ) : (
+            "Not updated yet."
+          )}{" "}
+          Next try in {retryMinutes} {retryMinutes === 1 ? "minute" : "minutes"}.
         </p>
       )}
 
@@ -108,7 +115,10 @@ function OverviewView({
             {/* The newest change of any kind, whatever range the timeline shows. */}
             {latest ? (
               <Stat title={`${latest.competitor.name}: ${latest.title}, ${shortDate(latest.detectedAt)}`}>
-                Last change <Value>{relative(latest.detectedAt, now)}</Value>
+                Last change{" "}
+                <Value>
+                  <Ago iso={latest.detectedAt} />
+                </Value>
               </Stat>
             ) : (
               <Stat>
@@ -117,7 +127,7 @@ function OverviewView({
             )}
             <Stat title={saved?.at ? `Updated ${dateTime(saved.at)}` : undefined}>
               {saved?.at && !nextRun(saved, now) ? "Updated" : "Next check"}{" "}
-              <Value>{!saved?.at ? "updating…" : nextRun(saved, now) ? relative(nextRun(saved, now)!, now) : relative(saved.at, now)}</Value>
+              <Value>{!saved?.at ? "updating…" : nextRun(saved, now) ? <Ago iso={nextRun(saved, now)!} next /> : <Ago iso={saved.at} />}</Value>
             </Stat>
           </>
         }
@@ -138,7 +148,10 @@ function OverviewView({
         newsSearched={
           newsTimes[0] ? (
             <Stat title={dateTime(newsTimes[0])}>
-              News searched <Value>{relative(newsTimes[0], now)}</Value>
+              News searched{" "}
+              <Value>
+                <Ago iso={newsTimes[0]} />
+              </Value>
             </Stat>
           ) : null
         }
