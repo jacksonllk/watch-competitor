@@ -103,7 +103,8 @@ describe("addCompetitor after a preview", () => {
     expect(created).toHaveLength(1);
     expect(created[0].target).toMatchObject({
       url: "https://acme-notes.example/plans",
-      instructions: "Report price changes. Only report changes about teams.",
+      // A pricing page's monitor takes the settings file's sentence alone: the focus never narrows pricing.
+      instructions: "Report price changes.",
     });
     expect(result.competitor.focus).toBe("Only report changes about teams.");
     expect(result.usage).toEqual({ "/v1/monitors/limits": { calls: 1, credits: 0 }, "/monitors": { calls: 1, credits: 0 } });

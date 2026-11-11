@@ -19,6 +19,8 @@ export function setupSteps(input: {
   isNew: boolean;
   /** null: news search turned off for this competitor, so it is not a step. support: the cause is the account, not the page. */
   news: { state: "setting_up" | "working" | "not_working" | "unknown"; noSource?: boolean; support?: boolean } | null;
+  /** Reading their changelog at Add. null: not read, so it is not a step. support: the cause is the account. */
+  history?: { ok: boolean; days: number; support?: boolean } | null;
   /** name: "their pricing page" for the running line. label: "Pricing" for the failed line. */
   monitors: { name: string; label: string; state: "setting_up" | "working" | "not_working" | "unknown"; support?: boolean }[];
 }): SetupStep[] {
@@ -42,7 +44,14 @@ export function setupSteps(input: {
       : n.state === "not_working" && !n.noSource
         ? [failed("News", n.support)]
         : [{ state: "done", text: "Searched the news from the last 90 days" }];
-  return [{ state: "done", text: "Found the company details" }, ...news, ...pages];
+  const h = input.history;
+  // Done when the read worked, even with no entries: the page was read, they shipped nothing in that window.
+  const history: SetupStep[] = !h
+    ? []
+    : h.ok
+      ? [{ state: "done", text: `Read their changelog from the last ${h.days} days` }]
+      : [{ state: "problem", text: `Changelog history failed.${h.support ? " Contact support." : ""}` }];
+  return [{ state: "done", text: "Found the company details" }, ...news, ...history, ...pages];
 }
 
 export function SettingUp({ isNew, steps, pad = "" }: { isNew: boolean; steps: SetupStep[]; pad?: string }) {

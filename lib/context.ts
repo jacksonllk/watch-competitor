@@ -19,6 +19,8 @@ import type {
   MonitorListRunsResponse,
   NewsSearchParams,
   NewsSearchResponse,
+  WebScrapeParams,
+  WebScrapeResponse,
 } from "context.dev/resources";
 
 /** Every request and every monitor carries this tag, so usage traces to this app. */
@@ -39,7 +41,8 @@ export type MonitorsApi = {
 };
 export type NewsApi = { search(body: NewsSearchParams): PromiseLike<NewsSearchResponse> };
 export type BrandApi = { search(query: BrandSearchParams): PromiseLike<BrandSearchResponse> };
-export type ContextApi = { monitors: MonitorsApi; news: NewsApi; brand: BrandApi };
+export type WebApi = { scrape(body: WebScrapeParams): PromiseLike<WebScrapeResponse> };
+export type ContextApi = { monitors: MonitorsApi; news: NewsApi; brand: BrandApi; web: WebApi };
 
 /** The live client. Reads CONTEXT_DEV_API_KEY. */
 export function liveApi(): ContextApi {
@@ -60,6 +63,8 @@ export const USAGE_ROW = {
   listMonitors: "/monitors (list)",
   runNow: "/monitors/{monitor_id}/run",
   updateMonitor: "/monitors/{monitor_id} (update)",
+  // The path the usage API reports (11 Nov). The dashboard's own name for this row is not checked yet.
+  scrape: "/v1/web/scrape",
 } as const;
 export type Usage = Record<string, { calls: number; credits: number }>;
 

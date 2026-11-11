@@ -7,7 +7,7 @@ import { failureOf, recordCall, USAGE_ROW, type MonitorsApi, type Usage } from "
 import { newsCheckKey, newsKey } from "./news";
 import type { Store } from "./store/types";
 import { changesKey, syncChanges } from "./sync";
-import { historyKey } from "./changelog-history";
+import { historyCheckKey, historyKey } from "./changelog-history";
 import { loadSecrets, saveSecrets } from "./webhook";
 import { monitorParams, startWatches, stopWatches, type ExtraPage, type MonitorOptions } from "./watches";
 
@@ -53,7 +53,13 @@ export async function deleteHistory(store: Store, slug: string): Promise<{ statu
   const competitor = all.find((c) => c.slug === slug);
   if (!competitor) return { status: "not_found" };
   if (competitor.status === "watching") return { status: "still_watching" };
-  await Promise.all([store.delete(changesKey(slug)), store.delete(newsKey(slug)), store.delete(newsCheckKey(slug)), store.delete(historyKey(slug))]);
+  await Promise.all([
+    store.delete(changesKey(slug)),
+    store.delete(newsKey(slug)),
+    store.delete(newsCheckKey(slug)),
+    store.delete(historyKey(slug)),
+    store.delete(historyCheckKey(slug)),
+  ]);
   // The deleted monitors' webhook secrets are no longer needed.
   const secrets = await loadSecrets(store);
   const ids = allWatches(competitor).map((w) => w.monitorId);

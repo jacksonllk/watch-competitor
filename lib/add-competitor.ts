@@ -4,7 +4,9 @@
  * Credits are counted from what the API reports on each response.
  */
 import { APP_TAG, recordCall, USAGE_ROW, type ContextApi, type Usage } from "./context";
+import { focusWords, historyCheckKey, historyKey, readChangelogHistory, type HistoryCheck } from "./changelog-history";
 import { allWatches, loadCompetitors, saveCompetitor, slugFor, type CompetitorRecord } from "./competitors";
+import { DEFAULT_CONFIG } from "./config";
 import { findPages, type FetchHop, type PageKind } from "./find-pages";
 import { checkNews, newsCheckKey, newsKey, relevantArticles, type NewsCheck } from "./news";
 import { normalizeDomain, previewKey, type Preview } from "./preview";
@@ -41,7 +43,7 @@ export async function addCompetitor(
   store: Store,
   api: ContextApi,
   input: AddInput,
-  options: { now?: Date; fetchHop?: FetchHop } & MonitorOptions = {},
+  options: { now?: Date; fetchHop?: FetchHop; historyDays?: number } & MonitorOptions = {},
 ): Promise<AddResult> {
   const now = options.now ?? new Date();
   const domain = normalizeDomain(input.domain);
@@ -112,7 +114,29 @@ export async function addCompetitor(
   } else {
     await checkNews(store, api.news, record, now, usage);
   }
+  await readHistory(store, api, record, pages.changelog, options.historyDays ?? DEFAULT_CONFIG.history.changelogDays, now, usage);
   return { status: "added", competitor: record, usage, firstChecks: allWatches(record).length };
+}
+
+/**
+ * Their changelog's entries from the last `days` days, saved as past launches ("From their changelog"), so the timeline
+ * shows what they shipped before the monitor started. Uses the same focus as the changelog monitor. Only when a
+ * changelog is watched and days > 0. A failed read is saved too, so the setup box can say so.
+ */
+async function readHistory(store: Store, api: ContextApi, record: CompetitorRecord, url: string | undefined, days: number, now: Date, usage: Usage) {
+  if (!url || days <= 0) return;
+  const from = new Date(now.getTime() - days * 86_400_000).toISOString();
+  const read = await readChangelogHistory(api.web, url, { from, to: now.toISOString(), focus: focusWords(record.focus) }, usage);
+  if (read.ok) await store.set(historyKey(record.slug), read.entries);
+  const check: HistoryCheck = {
+    at: now.toISOString(),
+    days,
+    ok: read.ok,
+    count: read.ok ? read.entries.length : 0,
+    pages: read.pages,
+    reason: read.ok ? null : read.reason,
+  };
+  await store.set(historyCheckKey(record.slug), check);
 }
 
 /** The confirmed pages, else the preview's scan, else a fresh scan (free: plain requests to their site). */

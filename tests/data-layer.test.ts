@@ -31,12 +31,22 @@ describe("watches", () => {
       target: {
         type: "page",
         url: "https://acme-notes.example/pricing",
+        // The focus is left off pricing pages: every change there matters.
         instructions:
-          "Report any change to plan names, prices, limits or what each plan includes. Ignore wording, layout and testimonial changes. Only report changes about sandboxes.",
+          "Report any change to plan names, prices, limits or what each plan includes. Report every price change, however small. Ignore wording, layout and testimonial changes.",
       },
       change_detection: { type: "semantic" },
       schedule: { type: "interval", frequency: 1, unit: "days" },
       tags: [APP_TAG, "cw:acme-notes", "kind:pricing"],
+    });
+  });
+
+  it("adds the focus to changelog monitors", () => {
+    expect(monitorParams({ ...acme, focus: "Only report changes about sandboxes." }, "changelog", "https://acme-notes.example/changelog").target).toEqual({
+      type: "page",
+      url: "https://acme-notes.example/changelog",
+      instructions:
+        "Report new features and product launches. Ignore bug fixes, patch notes and dependency bumps. Only report changes about sandboxes.",
     });
   });
 

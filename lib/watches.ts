@@ -10,7 +10,7 @@ import { DEFAULT_CONFIG, type Schedule } from "./config";
 import type { PageKind } from "./find-pages";
 
 export type MonitorOptions = {
-  /** The base sentence per page kind, from the settings file. The user's focus is added after it. */
+  /** The base sentence per page kind, from the settings file. The user's focus is added after it, except on pricing pages. */
   instructions?: Record<PageKind, string>;
   /** How often context.dev checks the page, from the settings file. Default once a day. */
   schedule?: Schedule;
@@ -36,9 +36,10 @@ export function monitorParams(
 ): MonitorCreateParams {
   const base = options.instructions ?? DEFAULT_CONFIG.instructions;
   const schedule = options.schedule ?? DEFAULT_CONFIG.schedule;
-  // Extra pages get the instruction for their kind of page, such as careers. The user's focus follows.
+  // Extra pages get the instruction for their kind of page, such as careers. The user's focus follows, except on
+  // pricing pages: every change there matters, so a focus such as "only sandboxes" must not hide a plan limit.
   const sentence = kind === "page" ? PAGE_INSTRUCTIONS[page ?? "other"] : base[kind];
-  const instructions = [sentence, competitor.focus].filter(Boolean).join(" ");
+  const instructions = [sentence, kind === "pricing" ? null : competitor.focus].filter(Boolean).join(" ");
   return {
     name: `${competitor.name} · ${label}`,
     target: { type: "page", url, instructions },

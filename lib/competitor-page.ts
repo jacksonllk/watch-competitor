@@ -1,7 +1,7 @@
 /** The competitor page's data, from the store only. */
 import { allWatches, loadCompetitors, MAIN_LABEL, type CompetitorRecord } from "./competitors";
 import { articleToEvent, filterKey, type CompetitorEvent, type EventKind } from "./events";
-import { historyToEvent, loadHistory } from "./changelog-history";
+import { historyCheckKey, historyToEvent, loadHistory, type HistoryCheck } from "./changelog-history";
 import { newsCheckKey, newsKey, oneStoryEach, relevantArticles, type Article, type NewsCheck } from "./news";
 import { loadEvents } from "./overview";
 import type { SavedStates } from "./refresh";
@@ -34,6 +34,8 @@ export type CompetitorPage = {
   settingUp: boolean;
   /** True once a page watch has compared the page at least once. */
   compared: boolean;
+  /** What reading their changelog at Add did. null: not read (no changelog watched, turned off, or added before 11 Nov). */
+  historyCheck: HistoryCheck | null;
   /** The chosen filter's key, or null for All. */
   filter: string | null;
 };
@@ -59,7 +61,7 @@ export async function loadCompetitorPage(
     watching.findIndex((c) => c.slug === slug),
   );
 
-  const [check, articles, events, history] = await Promise.all([
+  const [check, articles, events, history, historyCheck] = await Promise.all([
     store.get<NewsCheck>(newsCheckKey(slug)),
     // The relevance check also runs on news saved before it existed (9 Nov).
     store
@@ -67,6 +69,7 @@ export async function loadCompetitorPage(
       .then((a) => oneStoryEach(relevantArticles(a ?? [], competitor.name, competitor.domain).articles, competitor.name)),
     loadEvents(store, competitor),
     loadHistory(store, slug),
+    store.get<HistoryCheck>(historyCheckKey(slug)),
   ]);
 
   // The pricing page and changelog always show, watched or not. Extra pages show when there are any.
@@ -137,6 +140,7 @@ export async function loadCompetitorPage(
     nextCheck,
     settingUp: pageWatches.some((w) => w.state?.state === "setting_up"),
     compared: pageWatches.some((w) => w.state?.state === "working" && w.state.compared),
+    historyCheck: historyCheck ?? null,
     filter,
   };
 }

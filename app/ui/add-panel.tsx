@@ -370,7 +370,7 @@ export function AddPanel({ onClose, onAdded }: { onClose: () => void; onAdded: (
               placeholder="Only report changes about sandboxes."
               className="ui-field text-body w-full resize-none rounded-[6px] px-3 py-2 placeholder:text-muted"
             />
-            <p className="text-small mt-1.5 text-muted">We use this when we check their pages, not their news.</p>
+            <p className="text-small mt-1.5 text-muted">We use this when we check their changelog and other pages, not their pricing or news.</p>
           </Step>
 
           <Step

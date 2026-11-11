@@ -22,6 +22,9 @@ export function fakeContext(
     brandError?: APIError;
     runs?: Record<string, MonitorListRunsResponse.Data[]>;
     monitors?: MonitorListResponse.Data[];
+    /** Pages by address for scrape: Markdown and HTML. A missing address returns no Markdown. */
+    pages?: Record<string, { markdown: string; html?: string }>;
+    scrapeError?: APIError;
   } = {},
 ) {
   const created: MonitorCreateParams[] = [];
@@ -31,6 +34,7 @@ export function fakeContext(
   const brandSearched: string[] = [];
   const ran: string[] = [];
   const updated: { id: string; body: Record<string, unknown> }[] = [];
+  const scraped: string[] = [];
   const pageSize = options.pageSize ?? 100;
 
   const api: ContextApi = {
@@ -82,6 +86,19 @@ export function fakeContext(
         return { ...fixtureBrandSearch, key_metadata: { credits_consumed: 1, credits_remaining: 900 } };
       },
     },
+    web: {
+      async scrape(body) {
+        scraped.push(body.url);
+        if (options.scrapeError) throw options.scrapeError;
+        const page = options.pages?.[body.url];
+        const out = (data: string | null) => ({ data, requested: true, success: data !== null });
+        return {
+          markdown: out(page?.markdown ?? null),
+          html: out(page?.html ?? null),
+          key_metadata: { credits_consumed: 1, credits_remaining: 900 },
+        } as never;
+      },
+    },
     news: {
       async search(body) {
         searched.push(body);
@@ -98,7 +115,7 @@ export function fakeContext(
       },
     },
   };
-  return { api, created, deleted, listed, searched, brandSearched, ran, updated };
+  return { api, created, deleted, listed, searched, brandSearched, ran, updated, scraped };
 }
 
 export function apiError(status: number, error_code: string, error_data: Record<string, unknown> = {}) {

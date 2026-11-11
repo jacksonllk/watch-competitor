@@ -1,17 +1,38 @@
 /**
  * Past launches read from a competitor's own changelog page, so the timeline is not empty before its monitors start.
- * A monitor only sees changes from the day it starts. A changelog lists its own dated entries, so one read of the page
- * (Markdown) gives the last 90 days of launches. They show as Feature events marked "From their changelog".
+ * A monitor only sees changes from the day it starts. A changelog lists its own dated entries, so reading the page once
+ * when the competitor is added (Markdown) gives its recent launches: 90 days by default (`history.changelogDays` in the
+ * settings file). A changelog split into pages is read page by page, up to 3. They show as Feature events marked
+ * "From their changelog".
  * The reader knows three layouts, checked on saved real pages on 9 Nov (Modal, Daytona, E2B). A page in another layout
  * gives no entries, never wrong ones.
  */
+import type { WebScrapeResponse } from "context.dev/resources";
 import type { CompetitorRecord } from "./competitors";
+import { APP_TAG, failureOf, recordCall, USAGE_ROW, type Usage, type WebApi } from "./context";
 import type { CompetitorEvent } from "./events";
 import type { Store } from "./store/types";
 
 export type HistoryEntry = { id: string; date: string; title: string; summary: string; url: string };
 
 export const historyKey = (slug: string) => `history:${slug}`;
+
+/** What reading the changelog at Add did, for the "Getting set up" box. */
+export type HistoryCheck = {
+  at: string;
+  days: number;
+  ok: boolean;
+  /** Entries saved, after the date window, the focus and the housekeeping rule. */
+  count: number;
+  /** Pages read, each 1 scrape. */
+  pages: number;
+  /** out_of_credits: the cause is the developer's account ("Contact support."). */
+  reason: "failed" | "out_of_credits" | null;
+};
+export const historyCheckKey = (slug: string) => `historycheck:${slug}`;
+
+/** At most this many changelog pages are read per competitor, so a long changelog cannot run up the bill. */
+export const MAX_CHANGELOG_PAGES = 3;
 
 const MAINTENANCE = /\b(dependenc\w*|bumps?|bug ?fix\w*|fix(es|ed)?|patch(es)?|hotfix\w*|release branch sync)\b/i;
 
@@ -119,6 +140,93 @@ export function readChangelog(md: string, page: string, options: { from: string;
     })
     .map((e) => ({ ...e, id: `hist_${e.date.slice(0, 10)}_${e.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60)}` }))
     .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+/** "page=2" -> 2, ".../page/3" -> 3, anything else -> 1. */
+function pageNumber(url: URL): number {
+  const fromQuery = Number(url.searchParams.get("page"));
+  const fromPath = Number(url.pathname.match(/\/page\/(\d+)\/?$/)?.[1]);
+  return fromQuery > 0 ? fromQuery : fromPath > 0 ? fromPath : 1;
+}
+
+/**
+ * The next page of a changelog split into pages, from the page's HTML: a link marked rel="next", or a link on the same
+ * site to the same address with the next page number ("?page=2" or "/page/2"). null when there is none.
+ */
+export function nextPageUrl(html: string, pageUrl: string): string | null {
+  const here = new URL(pageUrl);
+  const n = pageNumber(here);
+  const base = here.pathname.replace(/\/page\/\d+\/?$/, "").replace(/\/$/, "");
+  const links = [...html.matchAll(/<(?:a|link)\b[^>]*>/gi)].map((m) => ({
+    href: m[0].match(/\shref\s*=\s*["']([^"']+)["']/i)?.[1],
+    rel: m[0].match(/\srel\s*=\s*["']([^"']+)["']/i)?.[1] ?? "",
+  }));
+  const resolve = (href: string | undefined) => {
+    try {
+      const url = href ? new URL(href.replace(/&amp;/g, "&"), here) : null;
+      return url && url.origin === here.origin ? url : null;
+    } catch {
+      return null;
+    }
+  };
+  for (const link of links) {
+    const url = resolve(link.href);
+    if (url && /\bnext\b/i.test(link.rel) && url.href !== here.href) return url.href;
+  }
+  for (const link of links) {
+    const url = resolve(link.href);
+    if (!url || pageNumber(url) !== n + 1) continue;
+    if (url.pathname.replace(/\/page\/\d+\/?$/, "").replace(/\/$/, "") === base) return url.href;
+  }
+  return null;
+}
+
+/**
+ * Reads a changelog's dated entries in [from, to), newest first, page by page while the oldest entry on a page is
+ * still inside the window, up to MAX_CHANGELOG_PAGES. 1 scrape per page. Never throws: a failed first page is a
+ * failed read, a failed later page keeps what the earlier pages gave.
+ */
+export async function readChangelogHistory(
+  api: WebApi,
+  url: string,
+  options: { from: string; to: string; focus?: string[] },
+  usage: Usage = {},
+): Promise<{ ok: true; entries: HistoryEntry[]; pages: number } | { ok: false; reason: "failed" | "out_of_credits"; pages: number }> {
+  const entries = new Map<string, HistoryEntry>();
+  const seen = new Set<string>();
+  let page: string | null = url;
+  let pages = 0;
+  while (page && pages < MAX_CHANGELOG_PAGES) {
+    let res: WebScrapeResponse;
+    try {
+      res = await api.scrape({ url: page, formats: { markdown: true, html: true }, markdownParams: { includeLinks: true }, tags: [APP_TAG] });
+    } catch (error) {
+      const failure = failureOf(error);
+      console.warn(`Changelog history: reading ${page} failed`, failure);
+      if (pages === 0) return { ok: false, reason: failure.status === 402 ? "out_of_credits" : "failed", pages };
+      break;
+    }
+    pages += 1;
+    recordCall(usage, USAGE_ROW.scrape, res);
+    const md = res.markdown?.data;
+    if (!md) {
+      console.warn(`Changelog history: no Markdown for ${page}`, res.markdown?.error_code ?? "");
+      if (pages === 1) return { ok: false, reason: "failed", pages };
+      break;
+    }
+    for (const e of readChangelog(md, page, options)) if (!entries.has(e.id)) entries.set(e.id, e);
+    // Every dated entry on the page, in or out of the window and the focus.
+    const onPage = readChangelog(md, page, { from: "", to: "~" });
+    const repeat = onPage.length > 0 && onPage.every((e) => seen.has(e.id));
+    for (const e of onPage) seen.add(e.id);
+    const oldest = onPage.at(-1)?.date;
+    const next: string | null = res.html?.data ? nextPageUrl(res.html.data, page) : null;
+    // Stop when the page has no dated entries, reaches the window's start, has no next page, or repeats an earlier
+    // page (a site that ignores the page number serves page 1 again).
+    if (!oldest || oldest < options.from || !next || repeat) break;
+    page = next;
+  }
+  return { ok: true, entries: [...entries.values()].sort((a, b) => b.date.localeCompare(a.date)), pages };
 }
 
 export async function loadHistory(store: Store, slug: string): Promise<HistoryEntry[]> {

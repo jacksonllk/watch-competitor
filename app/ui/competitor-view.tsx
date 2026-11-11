@@ -307,6 +307,11 @@ function SetupBox({ page }: { page: CompetitorPage }) {
       noSource: news.state === "not_working" && /news source/.test(news.reason),
       support: news.state === "not_working" && news.fix === "contact_support",
     },
+    history: page.historyCheck && {
+      ok: page.historyCheck.ok,
+      days: page.historyCheck.days,
+      support: page.historyCheck.reason === "out_of_credits",
+    },
     monitors: page.watches
       .filter((w) => w.kind !== "news" && w.url && w.state)
       .map((w) => ({

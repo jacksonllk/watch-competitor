@@ -47,6 +47,7 @@ export async function POST(request: Request) {
         instructions: config.instructions,
         schedule: config.schedule,
         webhookUrl: webhookUrl(),
+        historyDays: config.history.changelogDays,
       },
     );
     // Read every 15 seconds until the first checks are done, so the competitor page shows them within seconds.

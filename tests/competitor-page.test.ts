@@ -3,6 +3,7 @@ import { relative } from "@/app/ui/format";
 import { checkNow, deleteHistory, editAddress, removeCompetitor } from "@/lib/competitor-actions";
 import { loadCompetitorPage } from "@/lib/competitor-page";
 import { loadCompetitors, type CompetitorRecord } from "@/lib/competitors";
+import { DEFAULT_CONFIG } from "@/lib/config";
 import { fixtureChanges } from "@/lib/fixtures/changes";
 import { fixtureNewsSearch } from "@/lib/fixtures/preview";
 import { newsCheckKey, newsKey } from "@/lib/news";
@@ -85,7 +86,8 @@ describe("edit address", () => {
     expect(updated).toHaveLength(1);
     expect(updated[0].id).toBe("mon_p");
     expect(updated[0].body).toMatchObject({ status: "active", target: { type: "page", url: "https://acme-notes.example/plans" } });
-    expect((updated[0].body.target as { instructions: string }).instructions).toContain("Only report changes about teams.");
+    // The same instructions a new pricing monitor gets: the pricing sentence, without the focus.
+    expect((updated[0].body.target as { instructions: string }).instructions).toBe(DEFAULT_CONFIG.instructions.pricing);
     expect((await loadCompetitors(store))[0].watches.pricing?.url).toBe("https://acme-notes.example/plans");
   });
 
