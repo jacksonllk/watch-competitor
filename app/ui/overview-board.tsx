@@ -184,11 +184,20 @@ export function OverviewBoard({ rows, items, today: todayDay, earliest: earliest
       <section>
         <Strip end={newsSearched}>
           <h2 className="text-heading font-semibold text-ink">Feed</h2>
+          {/* One sentence: "18 changes in 25 days", "3 changes today", "2 changes on Nov 9". The picker shows the dates. */}
           <Stat>
-            Changes <Value>{shown.length}</Value>
-          </Stat>
-          <Stat>
-            In <Value>{span === 1 ? rangeText(from, to, today) : `${daysText(span)}, ${rangeText(from, to, today)}`}</Value>
+            <Value>{shown.length}</Value> {shown.length === 1 ? "change" : "changes"}{" "}
+            {span > 1 ? (
+              <>
+                in <Value>{daysText(span)}</Value>
+              </>
+            ) : to === today ? (
+              <Value>today</Value>
+            ) : (
+              <>
+                on <Value>{rangeText(from, to, today)}</Value>
+              </>
+            )}
           </Stat>
         </Strip>
         {/* One grid for every row, so each column is as wide as its widest value and rows still line up. */}
