@@ -3,8 +3,8 @@ import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import { loadCompetitorPage, type CompetitorPage, type WatchRow } from "@/lib/competitor-page";
 import type { CompetitorEvent, EventKind } from "@/lib/events";
-import { loadConfig } from "@/lib/config";
-import { PAGE_INSTRUCTIONS } from "@/lib/page-types";
+import { describeMonitor, loadConfig } from "@/lib/config";
+import { PAGE_DESCRIPTIONS } from "@/lib/page-types";
 import { loadTasks, loadTemplates } from "@/lib/prompt-templates";
 import { checkingFirstRuns, isDue, loadSavedStates } from "@/lib/refresh";
 import { isDemo } from "@/lib/links";
@@ -86,7 +86,7 @@ function View({
             url: w.url,
             ...(w.page ? { page: w.page } : {}),
             ...(w.monitorId ? { monitorId: w.monitorId } : {}),
-            reports: w.kind === "page" ? PAGE_INSTRUCTIONS[w.page ?? "other"] : config.instructions[w.kind],
+            reports: w.kind === "page" ? PAGE_DESCRIPTIONS[w.page ?? "other"] : describeMonitor(w.kind, config),
             settingUp: w.state?.state === "setting_up",
           },
         ],

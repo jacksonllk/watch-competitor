@@ -11,7 +11,7 @@ import { CompanyMark } from "./mark";
 import { DemoModal } from "./demo-modal";
 import { MonitorRow, ROW_BUTTON } from "./monitor-row";
 import { MoreMonitorsModal } from "./more-monitors";
-import { PAGE_INSTRUCTIONS } from "@/lib/page-types";
+import { PAGE_DESCRIPTIONS } from "@/lib/page-types";
 import { Tag } from "./tag";
 import { SupportText } from "./support-text";
 import { Sheet, useSheet } from "./sheet";
@@ -71,7 +71,7 @@ export function AddPanel({ onClose, onAdded }: { onClose: () => void; onAdded: (
   const [company, setCompany] = useState<Company | null>(null);
   const [focus, setFocus] = useState("");
   const [preview, setPreview] = useState<Preview | null>(null);
-  const [instructions, setInstructions] = useState<Record<Kind, string> | null>(null);
+  const [descriptions, setDescriptions] = useState<Record<Kind, string> | null>(null);
   const [newsDays, setNewsDays] = useState(1);
   const [monitors, setMonitors] = useState<{ used: number; limit: number } | null>(null);
   const [alreadyWatching, setAlreadyWatching] = useState(false);
@@ -122,7 +122,7 @@ export function AddPanel({ onClose, onAdded }: { onClose: () => void; onAdded: (
     const body = await post<{
       preview: Preview;
       spent: { credits: number };
-      instructions: Record<Kind, string>;
+      descriptions: Record<Kind, string>;
       newsEveryDays: number;
       monitors: { used: number; limit: number } | null;
       watching: boolean;
@@ -133,7 +133,7 @@ export function AddPanel({ onClose, onAdded }: { onClose: () => void; onAdded: (
       return;
     }
     setPreview(body.preview);
-    setInstructions(body.instructions);
+    setDescriptions(body.descriptions);
     setNewsDays(body.newsEveryDays ?? 1);
     setMonitors(body.monitors);
     setAlreadyWatching(body.watching);
@@ -370,7 +370,7 @@ export function AddPanel({ onClose, onAdded }: { onClose: () => void; onAdded: (
               placeholder="Only report changes about sandboxes."
               className="ui-field text-body w-full resize-none rounded-[6px] px-3 py-2 placeholder:text-muted"
             />
-            <p className="text-small mt-1.5 text-muted">We use this when we check their changelog and other pages, not their pricing or news.</p>
+            <p className="text-small mt-1.5 text-muted">Narrows the changes shown from their changelog and any extra pages you add. Pricing and news are always shown in full.</p>
           </Step>
 
           <Step
@@ -402,7 +402,7 @@ export function AddPanel({ onClose, onAdded }: { onClose: () => void; onAdded: (
                       kind={kind}
                       domain={company.domain}
                       choice={pages[kind]}
-                      reports={instructions?.[kind] ?? ""}
+                      reports={descriptions?.[kind] ?? ""}
                       onChange={(patch) => updatePage(kind, patch)}
                       onCheck={() => checkTyped(kind)}
                     />
@@ -421,7 +421,7 @@ export function AddPanel({ onClose, onAdded }: { onClose: () => void; onAdded: (
                         <span className="truncate">{shortUrl(p.url)}</span>
                       </div>
                       <p className="text-small mt-0.5 text-muted">
-                        {p.kind === "page" ? PAGE_INSTRUCTIONS[p.page ?? "other"] : (instructions?.[p.kind] ?? "")}
+                        {p.kind === "page" ? PAGE_DESCRIPTIONS[p.page ?? "other"] : (descriptions?.[p.kind] ?? "")}
                       </p>
                     </MonitorRow>
                   ))}

@@ -1,5 +1,5 @@
 import { loadCompetitors } from "@/lib/competitors";
-import { loadConfig } from "@/lib/config";
+import { describeMonitor, loadConfig } from "@/lib/config";
 import { normalizeDomain, previewCompany } from "@/lib/preview";
 import { jsonBody, setup, setupError, text } from "@/lib/server";
 
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   const watching = competitors.some((c) => c.domain === normalizeDomain(domain) && c.status === "watching");
   return Response.json({
     ...result,
-    instructions: config.instructions,
+    descriptions: { changelog: describeMonitor("changelog", config), pricing: describeMonitor("pricing", config) },
     newsEveryDays: config.news.everyDays,
     watching,
     monitors: limits ? { used: limits.monitors_used, limit: limits.monitors_limit } : null,

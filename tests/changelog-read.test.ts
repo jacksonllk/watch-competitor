@@ -194,3 +194,13 @@ describe("history.changelogDays in the settings file", () => {
     for (const bad of [-1, 400, 1.5, "ninety"]) expect(mergeConfig({ history: { changelogDays: bad } }).history.changelogDays).toBe(90);
   });
 });
+
+describe("what the screen says under a monitor", () => {
+  it("describes the default checks in plain words, and shows a developer's own instruction as it is", async () => {
+    const { describeMonitor, MAIN_DESCRIPTIONS } = await import("@/lib/config");
+    expect(describeMonitor("pricing", DEFAULT_CONFIG)).toBe(MAIN_DESCRIPTIONS.pricing);
+    expect(describeMonitor("changelog", DEFAULT_CONFIG)).toBe(MAIN_DESCRIPTIONS.changelog);
+    const custom = mergeConfig({ instructions: { pricing: "Report price changes for teams." } });
+    expect(describeMonitor("pricing", custom)).toBe("Report price changes for teams.");
+  });
+});

@@ -36,6 +36,20 @@ export const DEFAULT_CONFIG: Config = {
 
 export const CONFIG_FILE = "watch-competitor.config.json";
 
+/** What the pricing and changelog monitors do, in plain words for the screen, while they use the default instructions. */
+export const MAIN_DESCRIPTIONS: Record<PageKind, string> = {
+  changelog: "Picks up new features and launches, and ignores bug fixes and patch notes.",
+  pricing: "Flags every change to their plans, prices and limits, even small ones.",
+};
+
+/**
+ * The words the screen shows under a pricing or changelog monitor. A developer who changed the instruction in the
+ * settings file sees their own words, so the screen never describes a check the monitor does not do.
+ */
+export function describeMonitor(kind: PageKind, config: Pick<Config, "instructions">): string {
+  return config.instructions[kind] === DEFAULT_CONFIG.instructions[kind] ? MAIN_DESCRIPTIONS[kind] : config.instructions[kind];
+}
+
 /** Merges a parsed settings file over the defaults. Ignores keys and values it does not know. */
 export function mergeConfig(raw: unknown): Config {
   const input = (raw && typeof raw === "object" ? raw : {}) as Partial<Record<keyof Config, Record<string, unknown>>>;

@@ -5,6 +5,16 @@
  */
 export type PageType = "careers" | "customers" | "security" | "compare" | "blog" | "other";
 
+/** What a monitor on each kind of page does, in plain words for the screen. The instruction below is what context.dev's judge reads. */
+export const PAGE_DESCRIPTIONS: Record<PageType, string> = {
+  careers: "Tracks the jobs they open and close, with each role's team and location.",
+  customers: "Notices when they add or remove a customer, logo or case study.",
+  security: "Notices when they add or drop a certification, standard or data location.",
+  compare: "Follows their comparison pages and the claims they make about other companies.",
+  blog: "Picks up each new post and what it announces.",
+  other: "Flags real changes to what the page says, such as products, prices or claims.",
+};
+
 /** What a monitor on each kind of page reports. The user's focus is added after it. */
 export const PAGE_INSTRUCTIONS: Record<PageType, string> = {
   careers: "Report job openings that were added or closed, with their team and location. Ignore wording changes.",
