@@ -44,7 +44,8 @@ export type FeedItem = {
 
 const ZOOMS = [7, 30, 60, 90];
 const PAD = "px-(--gutter)";
-const DEFAULT_SPAN = 7;
+// The same as DEFAULT_SPAN in lib/overview.ts (that file reads the store, so it stays on the server).
+const DEFAULT_SPAN = 30;
 
 type Props = {
   rows: TimelineRow[];
@@ -75,7 +76,7 @@ export function OverviewBoard({ rows, items, today: todayDay, earliest: earliest
     setFilter(next.length === rows.length ? [] : next);
   };
 
-  // Keep the address in step, without a request. The default view (last 7 days, everyone) has a bare address.
+  // Keep the address in step, without a request. The default view (last 30 days, everyone) has a bare address.
   useEffect(() => {
     if (!settled) return;
     const t = setTimeout(() => {

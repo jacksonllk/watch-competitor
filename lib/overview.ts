@@ -17,8 +17,8 @@ const validDay = (day: string | undefined) => (day && /^\d{4}-\d{2}-\d{2}$/.test
 /** A range of whole days, both ends included, as YYYY-MM-DD (UTC). */
 export type DayRange = { from: string; to: string };
 
-/** Without a range in the address, the Overview shows the last 7 days. */
-export const DEFAULT_SPAN = 7;
+/** Without a range in the address, the Overview shows the last 30 days (11 Nov, Jackson): a new competitor brings 90 days of news and changelog, so it is never empty. */
+export const DEFAULT_SPAN = 30;
 
 /** The earliest day the Overview can show: 90 days back (the news and changelogs read at Add), or the oldest saved event. */
 export function earliestDay(events: CompetitorEvent[], today: string): string {
@@ -27,7 +27,7 @@ export function earliestDay(events: CompetitorEvent[], today: string): string {
   return oldest < floor ? oldest : floor;
 }
 
-/** The range in the address (from, to), kept between the earliest day and today. Default: the last 7 days. */
+/** The range in the address (from, to), kept between the earliest day and today. Default: the last 30 days. */
 export function readRange(from: string | undefined, to: string | undefined, today: string, earliest: string): DayRange {
   let end = validDay(to) ?? today;
   if (end > today) end = today;

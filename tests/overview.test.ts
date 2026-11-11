@@ -328,8 +328,8 @@ describe("earlier news on the Overview", () => {
 describe("date range", () => {
   const today = "2026-11-09";
   const earliest = "2026-08-12";
-  it("defaults to the last 7 days", () => {
-    expect(readRange(undefined, undefined, today, earliest)).toEqual({ from: "2026-11-03", to: today });
+  it("defaults to the last 30 days", () => {
+    expect(readRange(undefined, undefined, today, earliest)).toEqual({ from: "2026-10-11", to: today });
   });
 
   it("reads a custom range from the address", () => {
@@ -340,8 +340,8 @@ describe("date range", () => {
   it("keeps the range between the earliest day and today", () => {
     expect(readRange("2026-01-01", "2027-01-01", today, earliest)).toEqual({ from: earliest, to: today });
     expect(readRange("2026-10-20", "2026-10-10", today, earliest)).toEqual({ from: "2026-10-10", to: "2026-10-10" });
-    expect(readRange("garbage", "2026-13-45", today, earliest)).toEqual({ from: "2026-11-03", to: today });
-    expect(readRange(undefined, "2026-10-10", today, earliest)).toEqual({ from: "2026-10-04", to: "2026-10-10" });
+    expect(readRange("garbage", "2026-13-45", today, earliest)).toEqual({ from: "2026-10-11", to: today });
+    expect(readRange(undefined, "2026-10-10", today, earliest)).toEqual({ from: "2026-09-11", to: "2026-10-10" });
   });
 
   it("reaches 90 days back, or further when older changes are saved", () => {
