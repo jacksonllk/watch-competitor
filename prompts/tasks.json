@@ -101,14 +101,6 @@
       "instruction": "Say in plain words what changed on their {{page}} page and what it says about their plans. Say whether it is a threat, an opportunity or neither for us, and why. Then recommend what we should do, if anything, and how soon."
     },
     {
-      "id": "outreach",
-      "for": [
-        "customers"
-      ],
-      "label": "Draft outreach to customers they lost",
-      "instruction": "If a customer was removed from their page, draft a short, respectful email introducing us to that customer, with a subject line, and say who on our side should send it. If customers were only added, say what that tells us about who they sell to, and skip the email."
-    },
-    {
       "id": "claims",
       "for": [
         "compare"

@@ -306,7 +306,7 @@ describe("extra page types", () => {
     };
     const tasks = loadTasks();
     const ids = (page: "customers" | "careers" | "compare") => tasksFor({ ...base, kind: "page", label: "X", page }, tasks).map((t) => t.id);
-    expect(ids("customers")).toEqual(["assess", "outreach", "comparison", "sales", "team"]);
+    expect(ids("customers")).toEqual(["assess", "comparison", "sales", "team"]);
     expect(ids("careers")).toEqual(["assess", "sales", "team"]);
     expect(ids("compare")).toEqual(["assess", "claims", "comparison", "sales", "team"]);
     expect(tasksFor({ ...base, kind: "page", label: "Careers", page: "careers" }, tasks)[0].instruction).toContain("their Careers page");
