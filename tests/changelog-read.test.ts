@@ -204,3 +204,32 @@ describe("what the screen says under a monitor", () => {
     expect(describeMonitor("pricing", custom)).toBe("Report price changes for teams.");
   });
 });
+
+describe("changelog changes with nothing new", () => {
+  const event = (diff: string) =>
+    ({ id: "c", kind: "changelog", competitor: { slug: "acme", name: "Acme", domain: "acme.example" }, title: "Monitored value changed", summary: "", detectedAt: "2026-11-12T09:00:00Z", url: "", importance: "medium", before: null, after: null, diff, excerpt: null }) as const;
+  const renumbered = ["- 1. Nov 2 **Image Builder 2026.10**", "- 2. Oct 27 **Exit Snapshots for Sandboxes**", "+ 1. Nov 11 **Invoices in the dashboard**", "+ 2. Nov 4 **Kimi K3.1 Pro on Shared Endpoints**", "+ 3. Nov 2 **Image Builder 2026.10**", "+ 4. Oct 27 **Exit Snapshots for Sandboxes**"].join("\n");
+
+  it("finds the lines that are really new, ignoring list numbers", async () => {
+    const { newDiffLines } = await import("@/lib/events");
+    expect(newDiffLines(renumbered)).toEqual(["Nov 11 **Invoices in the dashboard**", "Nov 4 **Kimi K3.1 Pro on Shared Endpoints**"]);
+  });
+
+  it("hides a change that only renumbers or moves entries", async () => {
+    const { isChangelogNoise } = await import("@/lib/events");
+    expect(isChangelogNoise(event("- 1. Nov 2 **Image Builder**\n+ 3. Nov 2 **Image Builder**"), [])).toBe(true);
+  });
+
+  it("hides new entries that miss the focus, and keeps ones that match it or any new entry without a focus", async () => {
+    const { isChangelogNoise } = await import("@/lib/events");
+    expect(isChangelogNoise(event(renumbered), ["sandbox"])).toBe(true);
+    expect(isChangelogNoise(event(renumbered), [])).toBe(false);
+    expect(isChangelogNoise(event(`${renumbered}\n+ 5. Nov 12 **Sandbox sidecars GA**`), ["sandbox"])).toBe(false);
+  });
+
+  it("leaves pricing, news and past launches alone", async () => {
+    const { isChangelogNoise } = await import("@/lib/events");
+    expect(isChangelogNoise({ ...event("- 1. a\n+ 2. a"), kind: "pricing" }, [])).toBe(false);
+    expect(isChangelogNoise({ ...event("- 1. a\n+ 2. a"), origin: "changelog" }, [])).toBe(false);
+  });
+});

@@ -82,6 +82,29 @@ export function toEvent(change: Change, competitors: CompetitorWithPages[]): Com
   };
 }
 
+/** A diff line's text without its +/- mark and list number: "+ 3. November 2, 2026 …" -> "November 2, 2026 …". */
+const lineText = (line: string) => line.slice(1).trim().replace(/^\d+[.)]\s+/, "").replace(/^[-*•]\s+/, "").trim();
+
+/** The lines a diff adds that it does not also remove, ignoring list numbers: what is really new. */
+export function newDiffLines(diff: string): string[] {
+  const lines = diff.split("\n");
+  const removed = new Set(lines.filter((l) => l.startsWith("-")).map(lineText));
+  return lines.filter((l) => l.startsWith("+")).map(lineText).filter((t) => t && !removed.has(t));
+}
+
+/**
+ * A changelog change with nothing new to show (12 Nov, Jackson). When new entries land at the top of a numbered list,
+ * every older entry gets a new number, and context.dev's judge has reported that renumbering as "Monitored value
+ * changed" (Modal, 12 Nov). Hidden when, ignoring list numbers, the diff adds no new line, or when the competitor has
+ * a focus and no new line mentions it (the same focus words as the changelog history).
+ */
+export function isChangelogNoise(event: CompetitorEvent, focus: string[]): boolean {
+  if (event.kind !== "changelog" || event.origin || !event.diff) return false;
+  const added = newDiffLines(event.diff);
+  if (!added.length) return true;
+  return focus.length > 0 && !added.some((line) => focus.some((w) => line.toLowerCase().includes(w)));
+}
+
 /** A News API article as a timeline event. News has no importance rating and no diff. */
 export function articleToEvent(article: NewsSearchResponse.Data, competitor: Competitor): CompetitorEvent {
   return {

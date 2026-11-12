@@ -28,7 +28,8 @@ export const DEFAULT_CONFIG: Config = {
   history: { changelogDays: 90 },
   alerts: { pricing: "all", changelog: "high", news: "all", pages: "all", muted: [] },
   instructions: {
-    changelog: "Report new features and product launches. Ignore bug fixes, patch notes and dependency bumps.",
+    changelog:
+      "Report new features and product launches. Ignore bug fixes, patch notes and dependency bumps. Ignore list numbering and entries moving down the page.",
     pricing:
       "Report any change to plan names, prices, limits or what each plan includes. Report every price change, however small. Ignore wording, layout and testimonial changes.",
   },

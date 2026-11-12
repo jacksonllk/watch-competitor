@@ -3,8 +3,8 @@
  * Reads the store only. The page picks the range to show. Days are UTC.
  */
 import { allWatches, type CompetitorRecord } from "./competitors";
-import { articleToEvent, toEvent, type CompetitorEvent } from "./events";
-import { historyToEvent, loadHistory } from "./changelog-history";
+import { articleToEvent, isChangelogNoise, toEvent, type CompetitorEvent } from "./events";
+import { focusWords, historyToEvent, loadHistory } from "./changelog-history";
 import { newsCheckKey, newsKey, oneStoryEach, relevantArticles, type Article, type NewsCheck } from "./news";
 import type { Store } from "./store/types";
 import { loadChanges } from "./sync";
@@ -72,7 +72,10 @@ export async function loadEvents(store: Store, competitor: CompetitorRecord, opt
       .map((a) => articleToEvent(a, competitor)),
     ...history.map((h) => historyToEvent(h, competitor)),
   ];
-  return events.filter(isShown).sort((a, b) => b.detectedAt.localeCompare(a.detectedAt));
+  const focus = focusWords(competitor.focus);
+  return events
+    .filter((e) => isShown(e) && !isChangelogNoise(e, focus))
+    .sort((a, b) => b.detectedAt.localeCompare(a.detectedAt));
 }
 
 export type CompetitorRow = {

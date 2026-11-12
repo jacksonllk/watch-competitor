@@ -46,7 +46,7 @@ describe("watches", () => {
       type: "page",
       url: "https://acme-notes.example/changelog",
       instructions:
-        "Report new features and product launches. Ignore bug fixes, patch notes and dependency bumps. Only report changes about sandboxes.",
+        "Report new features and product launches. Ignore bug fixes, patch notes and dependency bumps. Ignore list numbering and entries moving down the page. Only report changes about sandboxes.",
     });
   });
 
