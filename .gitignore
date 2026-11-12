@@ -54,3 +54,6 @@ next-env.d.ts
 
 # Created by `vercel link` and `vercel env pull`. Never committed.
 .env*.local
+
+# Demo GIF frames (demo/README.md)
+/demo/frames/
