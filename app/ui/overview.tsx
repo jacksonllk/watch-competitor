@@ -297,10 +297,10 @@ function feedStatus(data: OverviewData): string {
 function Empty() {
   return (
     <section className={`flex flex-col items-center ${PAD} py-20 text-center md:py-28`}>
-      <h1 className="text-display font-semibold">Start tracking your competitors</h1>
+      <h1 className="text-display font-semibold">Start watching your competitors</h1>
       <p className="text-body mt-3 max-w-[520px] text-copy">
-        Add a competitor. Watch Competitor watches their pricing page, changelog and news, and saves every change. Assess any change with a ready
-        prompt for your AI agent.
+        Track their pricing, changelog, news and any other page you choose, such as careers or customers. Assess any change to get a prompt for
+        your AI agent to act on.
       </p>
       <div className="mt-6">
         <AddButton />

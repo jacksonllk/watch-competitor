@@ -5,7 +5,7 @@ export const REPO_URL = "https://github.com/jacksonllk/watch-competitor";
  * end (Jackson's rule: a one-click deploy button only for a host we deployed and tested). Until then the demo's
  * "run your own copy" card shows neither deploy link.
  */
-export const LAUNCHED = false;
+export const LAUNCHED = true;
 export const SELF_HOST_URL = LAUNCHED ? `${REPO_URL}#deploy-your-own` : "";
 /** Where a context.dev link sits in the app, so its visits trace to this project. */
 export type LinkSpot = "footer" | "demo_card" | "setup";
@@ -18,7 +18,7 @@ export function contextDevLink(spot: LinkSpot): string {
  * One-click deploy, for the one host we deploy and test ourselves (Vercel). Always shown next to "Other hosts".
  * Vercel's Deploy button (docs: vercel.com/docs/deploy-button/source): repository-url to clone, env to ask for the key,
  * and stores to add an Upstash Redis store from the Marketplace in the same flow (slugs from `vercel integration add
- * upstash/upstash-kv`). The env and stores parts are unverified until the button is clicked once the repo is public.
+ * upstash/upstash-kv`). Clicked end to end on 13 Nov 2026: clone, Upstash store, API key, deploy, then Add competitor.
  */
 export const DEPLOY_URL = LAUNCHED
   ? "https://vercel.com/new/clone?" +

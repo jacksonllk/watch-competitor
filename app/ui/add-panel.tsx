@@ -369,7 +369,6 @@ export function AddPanel({ onClose, onAdded }: { onClose: () => void; onAdded: (
               onChange={(e) => setFocus(e.target.value)}
               maxLength={300}
               rows={2}
-              placeholder="Only report changes about sandboxes."
               className="ui-field text-body w-full resize-none rounded-[6px] px-3 py-2 placeholder:text-muted"
             />
             <p className="text-small mt-1.5 text-muted">Narrows the changes shown from their changelog and any extra pages you add. Pricing and news are always shown in full.</p>
@@ -570,7 +569,9 @@ function PageRow({
         <>
           {!choice.url && !choice.found && (
             <p className="text-small flex min-h-6 items-center text-copy">
-              We couldn&apos;t find a {word} on {domain}. Enter its address, or leave it empty to watch without it.
+              {kind === "changelog"
+                ? `We couldn't find a changelog on ${domain}. Enter its address if they have one. If they announce launches on a blog, add it from Add monitors.`
+                : `We couldn't find a ${word} on ${domain}. Enter its address, or leave it empty to watch without it.`}
             </p>
           )}
           <label className={`ui-field flex ${choice.url || choice.found ? "" : "mt-1.5"} h-(--control-h-sm) items-center gap-2 rounded-[6px] px-2.5`}>
