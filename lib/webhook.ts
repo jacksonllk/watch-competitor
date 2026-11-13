@@ -9,6 +9,18 @@ import { APP_TAG, type MonitorsApi } from "./context";
 import type { Store } from "./store/types";
 
 export const WEBHOOK_PATH = "/api/webhooks/context-dev";
+
+/**
+ * The app's own public address, as written: APP_URL, else the production domain Vercel gives every deployment
+ * (VERCEL_PROJECT_PRODUCTION_URL, "always set … at both build and runtime", without https://). So a one-click Vercel
+ * copy gets real-time updates and Slack links with nothing to set. Empty when neither is set.
+ */
+export function publicAddress(env: Record<string, string | undefined> = process.env): string {
+  const own = env.APP_URL?.trim();
+  if (own) return own;
+  const vercel = env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  return vercel ? `https://${vercel.replace(/^https?:\/\//, "")}` : "";
+}
 export const WEBHOOK_SECRETS = "webhook-secrets";
 /** context.dev can replay an event for 7 days. Remember event IDs a little longer. */
 const SEEN_SECONDS = 8 * 24 * 60 * 60;
@@ -17,7 +29,7 @@ const MAX_AGE_SECONDS = 300;
 
 /** The address context.dev should send events to, or null when the app is not reachable from the internet. */
 export function webhookUrl(env: Record<string, string | undefined> = process.env): string | null {
-  const raw = env.APP_URL?.trim();
+  const raw = publicAddress(env);
   if (!raw) return null;
   let url: URL;
   try {

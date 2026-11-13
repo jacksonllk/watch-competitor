@@ -26,7 +26,6 @@ import { SettingUp, setupSteps } from "./setting-up";
 import { ManageMonitorsButton, type ManagedMonitor } from "./manage-monitors";
 import { STATE_COLOR, Stat, Strip, Value } from "./strip";
 import { Tag } from "./tag";
-import { SupportText } from "./support-text";
 
 const PAD = "px-(--gutter)";
 const OPEN_LABEL: Record<EventKind, string> = { pricing: "Open pricing page", changelog: "Open changelog", news: "Open article", page: "Open page" };
@@ -410,7 +409,7 @@ function BrokenWatches({ watches, slug }: { watches: WatchRow[]; slug: string })
         w.state?.state === "not_working" ? (
           <p key={`${w.kind}-${w.label ?? ""}`}>
             <span className="font-semibold text-ink">{w.label} is not working</span>
-            {w.state.since ? ` since ${shortDate(w.state.since)}` : ""}: {w.state.reason}. <SupportText text={FIX[w.state.fix] ?? ""} />
+            {w.state.since ? ` since ${shortDate(w.state.since)}` : ""}: {w.state.reason}. {FIX[w.state.fix] ?? ""}
             {w.monitorId && (w.state.fix === "edit_address" || w.state.fix === "try_another_page") && (
               <EditAddressButton slug={slug} monitorId={w.monitorId} label={w.label} url={w.url} />
             )}

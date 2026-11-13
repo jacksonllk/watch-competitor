@@ -13,7 +13,6 @@ import { MonitorRow, ROW_BUTTON } from "./monitor-row";
 import { MoreMonitorsModal } from "./more-monitors";
 import { PAGE_DESCRIPTIONS } from "@/lib/page-types";
 import { Tag } from "./tag";
-import { SupportText } from "./support-text";
 import { Sheet, useSheet } from "./sheet";
 import { useDemo } from "./shell";
 
@@ -44,7 +43,10 @@ function problemOf(body: { status?: string; cap?: number; nextRefillAt?: string 
       };
     case "out_of_credits":
       // The developer's account, not the user's problem: neutral words here, the cause in the server log.
-      return { text: "Company lookup failed. Contact support." };
+      // On the public demo, the demo's own lookups are used up, so point visitors to their own copy.
+      return demoMode
+        ? { text: "The demo can't look up more companies right now.", detail: "Run your own copy to look up any company." }
+        : { text: "Company lookup failed. Contact support." };
     case "setup_needed":
       return { text: body.message ?? "The app is not set up yet." };
     default:
@@ -506,7 +508,7 @@ function ProblemText({ problem }: { problem: Problem }) {
   return (
     <div className="ui-fade-in mt-2.5">
       <p className="text-body text-warn">
-        <SupportText text={problem.text} />
+        {problem.text}
       </p>
       {problem.detail && <p className="text-small mt-1 text-muted">{problem.detail}</p>}
     </div>

@@ -16,7 +16,6 @@ import { contextDevLink } from "@/lib/links";
 import { Footer } from "./context-dev";
 import { Ago } from "./ago";
 import { CompanyMark } from "./mark";
-import { SupportText } from "./support-text";
 import { OverviewBoard, type FeedItem } from "./overview-board";
 import { Refresher } from "./refresher";
 import { assessData } from "./assess-data";
@@ -275,7 +274,7 @@ function StatusLine({ watches, className = "" }: { watches: NamedState[]; classN
                 since <span className="figures">{shortDate(w.since)}</span>
               </>
             ) : null}
-            : {w.reason}. <SupportText text={FIX_TEXT[w.fix] ?? ""} />
+            : {w.reason}. {FIX_TEXT[w.fix] ?? ""}
           </p>
         ) : null,
       )}

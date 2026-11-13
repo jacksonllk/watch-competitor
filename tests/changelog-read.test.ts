@@ -233,3 +233,16 @@ describe("changelog changes with nothing new", () => {
     expect(isChangelogNoise({ ...event("- 1. a\n+ 2. a"), origin: "changelog" }, [])).toBe(false);
   });
 });
+
+describe("the app's public address", () => {
+  it("uses APP_URL, else the production domain Vercel sets, else nothing", async () => {
+    const { publicAddress, webhookUrl } = await import("@/lib/webhook");
+    const { appUrl } = await import("@/lib/background");
+    expect(publicAddress({ APP_URL: "https://watch.example.com", VERCEL_PROJECT_PRODUCTION_URL: "x.vercel.app" })).toBe("https://watch.example.com");
+    expect(publicAddress({ VERCEL_PROJECT_PRODUCTION_URL: "my-copy.vercel.app" })).toBe("https://my-copy.vercel.app");
+    expect(publicAddress({})).toBe("");
+    expect(webhookUrl({ VERCEL_PROJECT_PRODUCTION_URL: "my-copy.vercel.app" })).toBe("https://my-copy.vercel.app/api/webhooks/context-dev");
+    expect(appUrl({ VERCEL_PROJECT_PRODUCTION_URL: "my-copy.vercel.app" })).toBe("https://my-copy.vercel.app");
+    expect(webhookUrl({})).toBeNull();
+  });
+});

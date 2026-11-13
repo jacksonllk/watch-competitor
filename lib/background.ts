@@ -1,7 +1,7 @@
 /**
  * The work after each refresh: the daily news check for each competitor that is due, then Slack alerts for anything
- * new. Runs from the refresh route (the app is open), the context.dev webhook (a monitor run finished) and the cron
- * route (any scheduler with CRON_SECRET). News costs at most one search per competitor per `news.everyDays` days
+ * new. Runs from the refresh route (the app is open) and the context.dev webhook (after every monitor run, with or
+ * without a change). News costs at most one search per competitor per `news.everyDays` days
  * (settings file, default 1), however often it runs.
  */
 import { sendAlerts, type AlertResult } from "./alerts";
@@ -11,13 +11,14 @@ import type { ContextApi } from "./context";
 import { isDemo } from "./links";
 import { checkNews } from "./news";
 import type { Store } from "./store/types";
+import { publicAddress } from "./webhook";
 
 type Env = Record<string, string | undefined>;
 export type AfterRefresh = { newsChecked: number; alerts: AlertResult };
 
-/** The app's public address for links in alerts, from APP_URL. Null when it is not an http(s) address. */
+/** The app's public address for links in alerts (APP_URL, or Vercel's production domain). Null when it is not an http(s) address. */
 export function appUrl(env: Env = process.env): string | null {
-  const raw = env.APP_URL?.trim();
+  const raw = publicAddress(env);
   return raw && /^https?:\/\/[^\s]+$/.test(raw) ? raw.replace(/\/$/, "") : null;
 }
 

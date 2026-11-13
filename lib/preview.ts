@@ -1,11 +1,12 @@
 /**
  * The Add panel's lookups before anything is watched: company search and the preview
  * (90 days of news and the site scan). Results are cached for 24 hours in the store.
- * A daily credit cap, PREVIEW_DAILY_CREDIT_CAP (default 15), stops the paid calls.
+ * On the public demo, a daily credit cap (DEMO_CAP) stops the paid calls. Other copies have no cap.
  * Credits are counted from what each response reports.
  */
 import type { BrandApi, ContextApi, Usage } from "./context";
 import { APP_TAG, creditsOf, failureOf, recordCall, USAGE_ROW } from "./context";
+import { isDemo } from "./links";
 import { findPages, type FetchHop, type FoundPages } from "./find-pages";
 import { keepArticles, relevantArticles, searchNews, type Article, type NewsCheck } from "./news";
 import type { Store } from "./store/types";
@@ -27,15 +28,16 @@ export type Failure = { status: "cap_reached"; cap: number } | { status: "out_of
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const CACHE_SECONDS = 24 * 60 * 60;
-export const DEFAULT_CAP = 15;
+/** Credits the public demo's visitors may spend on lookups per day: 5 to 7 lookups. */
+export const DEMO_CAP = 15;
 
 export const searchKey = (by: "name" | "domain", query: string) => `preview:search:${by}:${query}`;
 export const previewKey = (domain: string) => `preview:${domain}`;
 export const capKey = (now: Date) => `preview:credits:${now.toISOString().slice(0, 10)}`;
 
-export function dailyCap(env: Record<string, string | undefined> = process.env): number {
-  const value = Number(env.PREVIEW_DAILY_CREDIT_CAP);
-  return env.PREVIEW_DAILY_CREDIT_CAP && Number.isInteger(value) && value >= 0 ? value : DEFAULT_CAP;
+/** The daily cap: DEMO_CAP on the public demo, none (null) on other copies. */
+export function dailyCap(env: Record<string, string | undefined> = process.env): number | null {
+  return isDemo(env) ? DEMO_CAP : null;
 }
 
 /** "https://www.Acme.com/pricing" -> "acme.com". */
@@ -90,10 +92,10 @@ export async function searchCompanies(
   store: Store,
   api: ContextApi,
   rawQuery: string,
-  options: { now?: Date; cap?: number } = {},
+  options: { now?: Date; cap?: number | null } = {},
 ): Promise<{ status: "ok"; companies: Company[]; spent: Spent; cached: boolean } | Failure> {
   const now = options.now ?? new Date();
-  const cap = options.cap ?? dailyCap();
+  const cap = options.cap === undefined ? dailyCap() : options.cap;
   const by = looksLikeDomain(rawQuery) ? "domain" : "name";
   const query = by === "domain" ? normalizeDomain(rawQuery) : rawQuery.trim().toLowerCase().replace(/\s+/g, " ");
   const usage: Usage = {};
@@ -101,7 +103,7 @@ export async function searchCompanies(
 
   const cached = await store.get<Company[]>(searchKey(by, query));
   if (cached) return { status: "ok", companies: cached, spent: { credits: 0, usage }, cached: true };
-  if ((await spentToday(store, now)) >= cap) return capReached(cap);
+  if (cap !== null && (await spentToday(store, now)) >= cap) return capReached(cap);
 
   const found = await brandSearch(api.brand, by, query, usage);
   if (!("ok" in found)) return found;
@@ -119,15 +121,15 @@ export async function previewCompany(
   store: Store,
   api: ContextApi,
   rawDomain: string,
-  options: { now?: Date; cap?: number; fetchHop?: FetchHop; query?: string } = {},
+  options: { now?: Date; cap?: number | null; fetchHop?: FetchHop; query?: string } = {},
 ): Promise<{ status: "ok"; preview: Preview; spent: Spent; cached: boolean } | Failure> {
   const now = options.now ?? new Date();
-  const cap = options.cap ?? dailyCap();
+  const cap = options.cap === undefined ? dailyCap() : options.cap;
   const domain = normalizeDomain(rawDomain);
   const usage: Usage = {};
   const cached = await store.get<Preview>(previewKey(domain));
   if (cached) return { status: "ok", preview: checkedNews(cached), spent: { credits: 0, usage }, cached: true };
-  if ((await spentToday(store, now)) >= cap) return capReached(cap);
+  if (cap !== null && (await spentToday(store, now)) >= cap) return capReached(cap);
 
   let credits = 0;
   let company = await companyFromSearchCache(store, domain, options.query);
@@ -175,8 +177,8 @@ function checkedNews(preview: Preview): Preview {
   return { ...preview, articles: relevant.articles };
 }
 
-/** People see "Today's company lookups are used up". The developer reads how to allow more here. */
+/** Visitors see "Today's company lookups are used up". The log says which cap stopped them. */
 function capReached(cap: number): Failure {
-  console.warn(`Company lookups stopped for today: PREVIEW_DAILY_CREDIT_CAP (${cap}) is reached. Raise it in .env to allow more.`);
+  console.warn(`Company lookups stopped for today: the demo's daily cap (${cap} credits) is reached.`);
   return { status: "cap_reached", cap };
 }

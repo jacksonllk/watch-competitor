@@ -133,10 +133,15 @@ describe("helpers", () => {
     expect(looksLikeDomain("Modal Labs")).toBe(false);
   });
 
-  it("reads the daily cap from the environment", () => {
-    expect(dailyCap({})).toBe(15);
-    expect(dailyCap({ PREVIEW_DAILY_CREDIT_CAP: "40" })).toBe(40);
-    expect(dailyCap({ PREVIEW_DAILY_CREDIT_CAP: "lots" })).toBe(15);
+  it("caps lookups on the public demo only", () => {
+    expect(dailyCap({ DEMO_MODE: "true" })).toBe(15);
+    expect(dailyCap({})).toBeNull();
+  });
+
+  it("never stops a copy that has no cap", async () => {
+    const store = createMemoryStore();
+    await store.set(capKey(now), 500);
+    expect(await searchCompanies(store, fakeContext().api, "acme", { now, cap: null })).toMatchObject({ status: "ok" });
   });
 
   it("checks an address the user typed", async () => {

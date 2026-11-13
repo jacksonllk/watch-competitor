@@ -10,7 +10,6 @@ import { Toast, useToast } from "./toast";
 const OpenAdd = createContext<() => void>(() => {});
 const Notify = createContext<(text: string) => void>(() => {});
 const Demo = createContext(false);
-const Support = createContext<string | null>(null);
 
 /** True on the public demo (DEMO_MODE=true): visitors try every step, nothing is created on the demo's key. */
 export const useDemo = () => useContext(Demo);
@@ -19,40 +18,35 @@ export const useDemo = () => useContext(Demo);
 export const useNotify = () => useContext(Notify);
 
 /** Holds the Add panel and the toast, so every "Add competitor" button opens the same panel. */
-/** Where "Contact support" links (SUPPORT_URL), or null for plain words. */
-export const useSupportUrl = () => useContext(Support);
-
-export function Shell({ children, demo = false, supportUrl = null }: { children: ReactNode; demo?: boolean; supportUrl?: string | null }) {
+export function Shell({ children, demo = false }: { children: ReactNode; demo?: boolean }) {
   const [open, setOpen] = useState(false);
   const { toast, notify } = useToast();
 
   return (
     <Demo.Provider value={demo}>
-      <Support.Provider value={supportUrl}>
-        <Notify.Provider value={notify}>
-          <OpenAdd.Provider value={() => setOpen(true)}>
-            <header className="sticky top-0 z-40 h-12 border-b border-rule bg-white/90 backdrop-blur">
-              <div className="mx-auto flex h-full max-w-[1200px] items-center gap-6 px-(--gutter)">
-                <Link href="/" className="text-heading flex items-center gap-2.5 font-semibold text-ink">
-                  <Logo />
-                  Watch Competitor
-                </Link>
-                <nav className="hidden h-full items-center sm:flex">
-                  <Suspense fallback={<OverviewLink active={false} />}>
-                    <CurrentOverviewLink />
-                  </Suspense>
-                </nav>
-                <div className="ml-auto">
-                  <AddButton />
-                </div>
+      <Notify.Provider value={notify}>
+        <OpenAdd.Provider value={() => setOpen(true)}>
+          <header className="sticky top-0 z-40 h-12 border-b border-rule bg-white/90 backdrop-blur">
+            <div className="mx-auto flex h-full max-w-[1200px] items-center gap-6 px-(--gutter)">
+              <Link href="/" className="text-heading flex items-center gap-2.5 font-semibold text-ink">
+                <Logo />
+                Watch Competitor
+              </Link>
+              <nav className="hidden h-full items-center sm:flex">
+                <Suspense fallback={<OverviewLink active={false} />}>
+                  <CurrentOverviewLink />
+                </Suspense>
+              </nav>
+              <div className="ml-auto">
+                <AddButton />
               </div>
-            </header>
-            {children}
-            {open && <AddPanel onClose={() => setOpen(false)} onAdded={(name) => notify(`Now watching ${name}. The first checks are running.`)} />}
-            <Toast toast={toast} />
-          </OpenAdd.Provider>
-        </Notify.Provider>
-      </Support.Provider>
+            </div>
+          </header>
+          {children}
+          {open && <AddPanel onClose={() => setOpen(false)} onAdded={(name) => notify(`Now watching ${name}. The first checks are running.`)} />}
+          <Toast toast={toast} />
+        </OpenAdd.Provider>
+      </Notify.Provider>
     </Demo.Provider>
   );
 }

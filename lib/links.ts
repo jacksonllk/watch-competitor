@@ -37,14 +37,3 @@ export function isDemo(env: Record<string, string | undefined> = process.env): b
   return env.DEMO_MODE === "true";
 }
 
-/**
- * SUPPORT_URL (optional): where "Contact support" links in the app, such as https://acme.com/help or help@acme.com.
- * A bare email becomes a mailto: link. Unset or not a link or an email: "Contact support" shows as plain words.
- */
-export function supportUrl(env: Record<string, string | undefined> = process.env): string | null {
-  const value = env.SUPPORT_URL?.trim();
-  if (!value) return null;
-  if (/^(https?:\/\/|mailto:)\S+$/i.test(value)) return value;
-  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return `mailto:${value}`;
-  return null;
-}

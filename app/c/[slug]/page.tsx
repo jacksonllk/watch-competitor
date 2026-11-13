@@ -2,11 +2,11 @@ import { Suspense } from "react";
 import { CompetitorView } from "@/app/ui/competitor-view";
 import { Footer } from "@/app/ui/context-dev";
 import { Shell } from "@/app/ui/shell";
-import { isDemo, supportUrl } from "@/lib/links";
+import { isDemo } from "@/lib/links";
 
 export default function Page({ params, searchParams }: PageProps<"/c/[slug]">) {
   return (
-    <Shell demo={isDemo()} supportUrl={supportUrl()}>
+    <Shell demo={isDemo()}>
       <main className="mx-auto flex min-h-[calc(100dvh-3rem)] max-w-[1200px] flex-col md:border-x md:border-rule">
         <Suspense fallback={<Loading />}>
           <CompetitorView params={params} searchParams={searchParams} />
